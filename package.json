@@ -1,0 +1,23 @@
+{
+  "name": "mahjong",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "jest": {
+    "preset": "ts-jest"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.11",
+    "@types/uuid": "^9.0.7"
+  },
+  "dependencies": {
+    "linked-list-typescript": "^1.0.15",
+    "uuid": "^9.0.1"
+  }
+}
