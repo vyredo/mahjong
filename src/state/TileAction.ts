@@ -11,8 +11,8 @@ enum ValidSuit {
 
 export type validDeclarationReturn = {
   hoo: boolean;
-  pong: [boolean, [string, string, string] | boolean];
-  kang: [boolean, [string, string, string, string] | boolean];
+  pong: [boolean, [string, string, string] | false];
+  kang: [boolean, [string, string, string, string] | false];
   chi: [boolean, [string, string, string][]];
 };
 
@@ -57,8 +57,8 @@ export class TileAction {
   }
 
   findSameTile(nextTile: Tile): {
-    pong: [boolean, [string, string, string] | boolean];
-    kang: [boolean, [string, string, string, string] | boolean];
+    pong: [boolean, [string, string, string] | false];
+    kang: [boolean, [string, string, string, string] | false];
   } {
     if (!this.validSuit(nextTile)) {
       return {

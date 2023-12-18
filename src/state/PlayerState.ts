@@ -1,8 +1,10 @@
+import { PhaseType } from "./Countdown";
+import { EventMainStateManager } from "./EventState";
 import { MainState, MainStateManager } from "./MainState";
 import { TileAction, validDeclarationReturn } from "./TileAction";
 import { Suit, Tile } from "./Tiles";
 import { v4 as uuidv4 } from "uuid";
-
+import * as Countdown from "./Countdown";
 export class PlayerState {
   name?: string;
 
@@ -57,8 +59,9 @@ export class PlayerStateManager {
     const total = revealed + concealed;
 
     if (total !== 13 && total !== 14) {
-      console.log(p);
-      console.log("revealed", JSON.stringify(p.revealedTiles));
+      console.log(`ERROR >> revealed and concealed should combine to 13 or 14, ${p.name} has ${total} tiles`);
+      // console.log(p);
+      // console.log("revealed", JSON.stringify(p.revealedTiles));
       throw new Error(`revealed and concealed should combine to 13 or 14, ${p.name} has ${total} tiles`);
     }
   }
@@ -114,8 +117,12 @@ export class PlayerStateManager {
     p: PlayerState,
     state: MainState,
     type: "hoo" | "pong" | "kang" | "chi" = "chi",
-    tiles?: [string, string, string] | [string, string, string, string]
+    tiles: [string, string, string] | [string, string, string, string]
   ) {
+    if (Countdown.getCurrentPhase() !== PhaseType.DeclareCountdownStart) {
+      return;
+    }
+
     let value = 0;
 
     if (type === "hoo" && p.validActions?.hoo) {
@@ -127,13 +134,22 @@ export class PlayerStateManager {
     } else if (type === "chi" && p.validActions?.chi) {
       value = 1;
     }
+    console.log(`[DECLARE] ${p.name} ${type} `);
 
-    state.declare.playerDeclarations.push({ value, type, tiles, player: p });
+    const playerIdx = state.persistentState.players.findIndex((p) => p.playerConnId === p.playerConnId) as number;
+
+    if (playerIdx === -1) {
+      console.error("playerIdx is -1");
+    } else if (playerIdx > 3) {
+      console.error("playerIdx is > 3");
+    }
+
+    state.declare.playerDeclarations.push({ value, type, tiles, player: p, playerIdx: playerIdx as 0 | 1 | 2 | 3 });
   }
 
   static revealTile(p: PlayerState, tilesStr: [string, string, string] | [string, string, string, string], type: "pong" | "kang" | "chi") {
     const tile1idx = p.hands.findIndex((t) => t.name === tilesStr[0]);
-    console.log("tiles", p.name, tilesStr);
+    console.log("[REVEALED TILES]", p.name, tilesStr);
 
     const tile1 = p.hands.splice(tile1idx, 1)[0];
     console.log("tile1idx", tile1idx, p.hands.length);
@@ -165,7 +181,6 @@ export class PlayerStateManager {
       tiles,
     });
     const revealedTilesNum = p.revealedTiles.reduce((acc, curr) => acc + curr.tiles.length, 0);
-    console.log("revealedTiles", revealedTilesNum);
     console.log(p.name, p.hands.length, revealedTilesNum, p.hands.length + revealedTilesNum);
 
     // PlayerStateManager.validateTiles(p);
@@ -175,5 +190,29 @@ export class PlayerStateManager {
 
   static removeValidActions(p: PlayerState) {
     p.validActions = null;
+  }
+
+  static takeTileFromTableAndGiveToPlayer(state: MainState): Tile {
+    if (state.tableTiles.length === 15) {
+      throw new Error("game over " + state.tableTiles.length);
+    }
+
+    const tile = state.tableTiles.removeHead();
+    const currentPlayer = state.persistentState.players[state.turn.playerToDeal];
+
+    // if flower or animal immediately add to flowerTile
+    if (tile.type === Suit.RedFlower || tile.type === Suit.BlackFlower || tile.type === Suit.Animal) {
+      console.log(currentPlayer.name, "takeFlowerTile", tile);
+      EventMainStateManager.emitEvent("takeFlowerTile", state);
+      PlayerStateManager.revealFlowerTile(currentPlayer, tile);
+      return PlayerStateManager.takeTileFromTableAndGiveToPlayer(state);
+    } else {
+      console.log(currentPlayer.name, "take tile ", tile);
+      EventMainStateManager.emitEvent("takeTileFromTableAndGiveToPlayer", state);
+      PlayerStateManager.includeTileFromTable(currentPlayer, tile);
+    }
+
+    PlayerStateManager.validateTiles(currentPlayer);
+    return tile;
   }
 }

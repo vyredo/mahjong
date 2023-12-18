@@ -4,6 +4,7 @@ import { LinkedList } from "linked-list-typescript";
 import { v4 as uuidv4 } from "uuid";
 import { EventMainStateManager } from "./EventState";
 import { TileAction } from "./TileAction";
+import * as Countdown from "./Countdown";
 
 enum Phase {
   Shuffle,
@@ -13,18 +14,23 @@ enum Phase {
   PostDeclare,
 }
 
+interface Declaration {
+  // check how many player can declare, if none , then move to next player
+  // if has player declare, then has all of them declare,
+  // otherwise wait for timeout
+  type: "chi" | "pong" | "kang" | "hoo";
+  value: number;
+  tiles?: [string, string, string, string] | [string, string, string];
+  player: PlayerState;
+  playerIdx: 0 | 1 | 2 | 3;
+}
+
 export class MainState {
   persistentState = {
     id: uuidv4(),
     gameTotalRound: 1,
     firstBankerIdx: null as 0 | 1 | 2 | 3 | null, // 0, 1, 2, 3
     players: [] as PlayerState[],
-  };
-  countdown = {
-    // after first shuffle
-    playerBeforeFirstTurnCountdown: 30, // seconds
-    playerTurnCountdown: 15, // seconds
-    playerDeclareCountdown: 5, // seconds
   };
 
   shuffle = {
@@ -43,15 +49,7 @@ export class MainState {
   };
 
   declare: {
-    // check how many player can declare, if none , then move to next player
-    // if has player declare, then has all of them declare,
-    // otherwise wait for timeout
-    playerDeclarations: {
-      type: "chi" | "pong" | "kang" | "hoo";
-      value: number;
-      tiles?: [string, string, string, string] | [string, string, string];
-      player: PlayerState;
-    }[];
+    playerDeclarations: Declaration[];
     countdown: number;
   } = {
     playerDeclarations: [],
@@ -86,7 +84,7 @@ export class MainStateManager {
   static countdownTimeout = 0;
 
   static reset(state: MainState) {
-    MainStateManager.resetPlayerCountdown(state.countdown.playerBeforeFirstTurnCountdown);
+    // MainStateManager.resetPlayerCountdown(state.countdown.playerBeforeFirstTurnCountdown);
     const persistentState = { ...state.persistentState };
     state = new MainState();
     state.persistentState = persistentState;
@@ -113,49 +111,48 @@ export class MainStateManager {
       state.persistentState.players.push(player);
     }
 
+    Countdown.registerEvent(Countdown.PhaseType.OrganizeHandsCountdownEnd, ({ state }) => {
+      // when countdown is over, then move to deal phase
+      MainStateManager.DealPhase({ state, initGame: true });
+    });
+    Countdown.registerEvent(Countdown.PhaseType.DealCountdownEnd, ({ state, shouldSkip }) => {
+      console.log(`[DealCountdownEnd], shouldSkip: ${shouldSkip}`);
+      if (shouldSkip) {
+        // countdown is over, skip player turn
+        MainStateManager.forceSkipPlayerTurn(state);
+      }
+
+      console.log("running DealPhase");
+      // if player click done, then move to declare phase
+      MainStateManager.DeclarationPhase(state);
+    });
+    Countdown.registerEvent(Countdown.PhaseType.DeclareCountdownEnd, ({ state }) => {
+      // countdown declare is over, don't autodeclare.
+      // some win condition are automatic, TODO:
+      const skipTakeFromTable = MainStateManager.executeHighestDeclaration(state);
+      MainStateManager.DealPhase({ state, skipTakeFromTable });
+    });
+    Countdown.registerEvent(Countdown.PhaseType.Gameover, () => {});
     EventMainStateManager.emitEvent("init", state);
+
+    // start first game
+    MainStateManager.startFirstGame(state);
   }
 
-  static tileMustbe148(state: MainState) {
-    const players = state.persistentState.players;
-    const playerTiles = players.map((player) => player.hands.length).reduce((a, b) => a + b, 0);
-    const playerConcealedTiles = players.map((player) => player.revealedTiles.length).reduce((a, b) => a + b, 0);
-    const flowerTiles = players.map((player) => player.flowerTiles.length).reduce((a, b) => a + b, 0);
-    const tableTiles = state.tableTiles.length;
-    const tableDiscardedTiles = state.tableDiscardedTiles.length;
-    const currentDiscardedTile = state.currentDiscardedTile ? 1 : 0;
-
-    if (playerTiles + tableTiles + tableDiscardedTiles + flowerTiles + playerConcealedTiles + currentDiscardedTile != 148) {
-      throw new Error("tileMustbe148");
-    }
-  }
-
-  static shuffleTableTiles(state: MainState) {
-    const tileset = TileSet.tiles.slice();
-    const shuffleTileset = new LinkedList<Tile>();
-    while (tileset.length > 0) {
-      const idx = Math.round(Date.now() + Math.random()) % tileset.length;
-      const tile = tileset.splice(idx, 1)[0];
-      shuffleTileset.append(tile);
-    }
-
-    // change this to linkedlist
-    state.tableTiles = shuffleTileset;
-
-    MainStateManager.tileMustbe148(state);
-    return shuffleTileset;
-  }
-
-  static firstGame(state: MainState) {
+  static startFirstGame(state: MainState) {
     MainStateManager.reset(state);
-    MainStateManager.shuffleTableTiles(state);
+    TileSet.shuffleTableTiles(state);
 
     const dice = MainStateManager.dealDice();
     const bankerIdx = dice.total % 4;
     MainStateManager.assignBankerAndResetPlayerTurn({ initFirstBanker: bankerIdx, state });
-    MainStateManager.shufflePlayerTiles(state);
+    TileSet.shufflePlayerTiles(state);
 
-    MainStateManager.nextPlayerTurn({ state, initGame: true });
+    // start countdown for player to organize hands
+    Countdown.emitEvent({
+      phase: Countdown.PhaseType.OrganizeHandsCountdownStart,
+      state,
+    });
     EventMainStateManager.emitEvent("firstGame", state);
   }
 
@@ -168,70 +165,35 @@ export class MainStateManager {
     ++state.persistentState.gameTotalRound;
 
     MainStateManager.reset(state);
-    MainStateManager.shuffleTableTiles(state);
+    TileSet.shuffleTableTiles(state);
 
     MainStateManager.assignBankerAndResetPlayerTurn({ state });
-    MainStateManager.shufflePlayerTiles(state);
-    MainStateManager.nextPlayerTurn({ state, initGame: true });
+    TileSet.shufflePlayerTiles(state);
 
+    // start countdown for player to organize hands
+    Countdown.emitEvent({
+      phase: Countdown.PhaseType.OrganizeHandsCountdownStart,
+      state,
+    });
     EventMainStateManager.emitEvent("nextGame", state);
   }
 
-  static resetPlayerCountdown(count: number) {
-    // cancel all timeout
-    MainStateManager.countdownTimeout = count;
-    clearTimeout(MainStateManager.countdownTimeout);
+  static forceSkipPlayerTurn(state: MainState) {
+    // skip current player
+    const player = state.persistentState.players[state.turn.playerToDeal];
+    const lastTile = player.hands[player.hands.length - 1];
+    console.log("forceSkip", player.name, player.hands.length);
+    PlayerStateManager.discardTileToTable(player, state, lastTile);
+    console.log("after discard", player.name, player.hands.length);
+
+    EventMainStateManager.emitEvent("skipCurrentPlayer", state);
   }
 
-  static takeTileFromTableAndGiveToPlayer(state: MainState): Tile {
-    if (state.tableTiles.length === 15) {
-      throw new Error("game over " + state.tableTiles.length);
-    }
-
-    const tile = state.tableTiles.removeHead();
-    const currentPlayer = state.persistentState.players[state.turn.playerToDeal];
-
-    // if flower or animal immediately add to flowerTile
-    if (tile.type === Suit.RedFlower || tile.type === Suit.BlackFlower || tile.type === Suit.Animal) {
-      EventMainStateManager.emitEvent("takeFlowerTile", state);
-      PlayerStateManager.revealFlowerTile(currentPlayer, tile);
-      return MainStateManager.takeTileFromTableAndGiveToPlayer(state);
-    } else {
-      EventMainStateManager.emitEvent("takeTileFromTableAndGiveToPlayer", state);
-      PlayerStateManager.includeTileFromTable(currentPlayer, tile);
-    }
-
-    PlayerStateManager.validateTiles(currentPlayer);
-    return tile;
-  }
-
-  static async nextPlayerTurn({
-    state,
-    initGame,
-    forceSkip,
-    skipTakeFromTable,
-  }: {
-    state: MainState;
-    initGame?: boolean;
-    forceSkip?: boolean;
-    skipTakeFromTable?: boolean;
-  }) {
-    if (forceSkip) {
-      // skip current player
-      const player = state.persistentState.players[state.turn.playerToDeal];
-      const lastTile = player.hands[player.hands.length - 1];
-      console.log("forceSkip", player.name, player.hands.length);
-      PlayerStateManager.discardTileToTable(player, state, lastTile);
-      console.log("after discard", player.name, player.hands.length);
-
-      EventMainStateManager.emitEvent("skipCurrentPlayer", state);
-      MainStateManager.playerDeclarationPhase(state);
-      return;
-    }
+  static async DealPhase({ state, initGame, skipTakeFromTable }: { state: MainState; initGame?: boolean; skipTakeFromTable?: boolean }) {
+    EventMainStateManager.emitEvent("DealPhase", state);
 
     // reset
     state.turn.totalTurn++;
-    MainStateManager.resetPlayerCountdown(state.countdown.playerTurnCountdown);
 
     // next-player
     if (initGame) {
@@ -244,14 +206,14 @@ export class MainStateManager {
       // take from table for next user
       state.turn.playerToDeal = ((state.turn.playerToDeal + 1) % 4) as 0 | 1 | 2 | 3;
       // getTile for next-player
-      const tile = MainStateManager.takeTileFromTableAndGiveToPlayer(state);
-      if (!tile) throw new Error("tile should be assigned" + tile);
+      PlayerStateManager.takeTileFromTableAndGiveToPlayer(state);
     }
 
-    // reset to default value
-    state.turn.countdown = state.countdown.playerTurnCountdown;
-    await MainStateManager.runPlayerTurnCountdown(state);
-    EventMainStateManager.emitEvent("nextPlayerTurn", state);
+    // start countdown for player to deal
+    Countdown.emitEvent({
+      phase: Countdown.PhaseType.DealCountdownStart,
+      state,
+    });
   }
 
   static async runPlayerTurnCountdown(state: MainState) {
@@ -269,15 +231,13 @@ export class MainStateManager {
         // force skip after countdown is 0
         resolve(null);
         clearTimeout(MainStateManager.countdownTimeout);
-        MainStateManager.nextPlayerTurn({ state, forceSkip: true });
+        MainStateManager.forceSkipPlayerTurn(state);
       }
     });
   }
 
-  static async playerDeclarationPhase(state: MainState) {
-    // check if player can declare
-    if (!state.currentDiscardedTile) throw new Error("tile should be assigned");
-    const { tile, prevOwner } = state.currentDiscardedTile;
+  static async DeclarationPhase(state: MainState) {
+    const { tile, prevOwner } = state.currentDiscardedTile!;
 
     let playerCanDeclare = 0;
     state.persistentState.players.forEach((player) => {
@@ -290,85 +250,117 @@ export class MainStateManager {
       const canDeclare = result.chi[0] || result.pong[0] || result.kang[0] || result.hoo;
 
       if (canDeclare) {
-        player.canDeclare = true;
         player.validActions = result;
         playerCanDeclare++;
 
         // auto declare the highest value
-        // TODO remove auto declare
+        // =========================== TODO remove auto declare ===========================
+
         if (result.hoo) {
-          PlayerStateManager.declareAction(player, state, "hoo");
-        } else if (result.kang[0]) {
-          PlayerStateManager.declareAction(player, state, "kang", [tile.name, tile.name, tile.name, tile.name]);
-        } else if (result.pong[0]) {
-          PlayerStateManager.declareAction(player, state, "pong", [tile.name, tile.name, tile.name]);
-        } else if (result.chi[0]) {
-          PlayerStateManager.declareAction(player, state, "chi", result.chi[1][0]);
+          // hoo does not need tile
+          PlayerStateManager.declareAction(player, state, "hoo", [] as any);
+          return;
         }
+
+        let tiles: [string, string, string, string] | [string, string, string];
+        if (result.kang[0] && result.kang[1]) {
+          tiles = result.kang[1];
+          PlayerStateManager.declareAction(player, state, "kang", tiles);
+        } else if (result.pong[0] && result.pong[1]) {
+          tiles = result.pong[1];
+          PlayerStateManager.declareAction(player, state, "pong", tiles);
+        } else if (result.chi[0] && result.chi[1]) {
+          tiles = result.chi[1][0];
+          PlayerStateManager.declareAction(player, state, "chi", tiles);
+        }
+
+        console.log(`[AUTO DECLARE] done`);
+        // auto declare the highest value
+        // =========================== TODO remove auto declare ===========================
       }
     });
 
     if (playerCanDeclare === 0) {
-      // move to next player
-      MainStateManager.stopDeclare(state);
-      MainStateManager.nextPlayerTurn({ state });
-      console.log("no player can declare");
+      console.log("No player can declare, move to next player");
+      // no player can declare, then move to next player
+      Countdown.emitEvent({
+        phase: Countdown.PhaseType.DeclareCountdownEnd,
+        state,
+      });
       return;
     }
 
-    // countdown
-    state.declare.countdown = state.countdown.playerDeclareCountdown;
-    await MainStateManager.runPlayerDeclareCountdown(state);
-  }
-
-  static stopDeclare(state: MainState) {
-    state.persistentState.players.forEach((player) => {
-      player.canDeclare = false;
+    Countdown.emitEvent({
+      phase: Countdown.PhaseType.DeclareCountdownStart,
+      state,
     });
   }
-  static runPlayerDeclareCountdown(state: MainState) {
-    return new Promise((resolve) => {
-      state.declare.countdown--;
-      if (state.declare.countdown >= 0) {
-        clearTimeout(MainStateManager.countdownTimeout);
-        MainStateManager.countdownTimeout = setTimeout(() => {
-          console.log("declaration phase", state.declare.countdown);
-          MainStateManager.runPlayerDeclareCountdown(state);
-          // check valid move for each player
-        }, 1000) as unknown as number;
-        return;
-      } else {
-        // force skip after countdown is 0
-        // check the declaration and player action to declare
-        let revealTile = false;
-        if (state.declare.playerDeclarations.length > 0) {
-          // Hoo > Kang > Pong > Chi
-          // if multiple player declare, then check the priority
-          state.declare.playerDeclarations.sort((a, b) => {
-            return b.value - a.value;
-          });
-          const { player, tiles, type } = state.declare.playerDeclarations[0];
-          if (type === "hoo" || tiles == null) {
-            throw new Error("hoo should be handled in TileAction, TODO");
-          }
-          if (!state.currentDiscardedTile?.tile) throw new Error("currentDiscardedTile should be assigned");
 
-          const playerIdx = state.persistentState.players.indexOf(player);
-          player.hands.push(state.currentDiscardedTile.tile);
-          PlayerStateManager.revealTile(player, tiles, type);
+  static executeHighestDeclaration(state: MainState) {
+    // force skip after countdown is 0
+    // check the declaration and player action to declare
+    if (state.declare.playerDeclarations.length > 0) {
+      // Hoo > Kang > Pong > Chi
+      // if multiple player declare, then check the priority
 
-          state.turn.playerToDeal = playerIdx as 0 | 1 | 2 | 3;
-          revealTile = true;
-          // reset player declaration
-          state.declare.playerDeclarations = [];
-          state.declare.countdown = state.countdown.playerDeclareCountdown;
+      const HooDeclaration: Declaration[] = [];
+      const KangDeclaration: Declaration[] = [];
+      const PongDeclaration: Declaration[] = [];
+      const ChiDeclaration: Declaration[] = [];
+
+      state.declare.playerDeclarations.forEach((declaration) => {
+        if (declaration.type === "kang") {
+          KangDeclaration.push(declaration);
+        } else if (declaration.type === "pong") {
+          PongDeclaration.push(declaration);
+        } else if (declaration.type === "chi") {
+          ChiDeclaration.push(declaration);
+        } else if (declaration.type === "hoo") {
+          HooDeclaration.push(declaration);
         }
+      });
 
-        resolve(null);
-        MainStateManager.stopDeclare(state);
-        MainStateManager.nextPlayerTurn({ state, skipTakeFromTable: revealTile });
+      let targetDeclaration: Declaration | null = null;
+      const currentPlayerIdx = state.turn.playerToDeal;
+
+      // handle multiple Pongs, Kangs, Chis. we find the current player first then move to next player
+      const findCurrentPlayer = (declarations: typeof MainState.prototype.declare.playerDeclarations, currentPlayerIdx: number): Declaration => {
+        const nextDeclaration = declarations.find((declaration) => declaration.playerIdx === currentPlayerIdx);
+        if (!nextDeclaration) {
+          return findCurrentPlayer(declarations, (currentPlayerIdx + 1) % 4);
+        }
+        return nextDeclaration;
+      };
+
+      if (HooDeclaration.length > 0) {
+        // TODO: no Hoo at the moment
+      } else if (KangDeclaration.length > 0) {
+        targetDeclaration = findCurrentPlayer(KangDeclaration, currentPlayerIdx);
+      } else if (PongDeclaration.length > 0) {
+        targetDeclaration = findCurrentPlayer(PongDeclaration, currentPlayerIdx);
+      } else if (ChiDeclaration.length > 0) {
+        targetDeclaration = findCurrentPlayer(ChiDeclaration, currentPlayerIdx);
       }
-    });
+
+      if (!targetDeclaration) throw new Error("targetDeclaration should be assigned");
+
+      const { player, tiles, type } = targetDeclaration;
+      if (type === "hoo" || tiles == null) {
+        throw new Error("hoo should be handled in TileAction, TODO");
+      }
+      if (!state.currentDiscardedTile?.tile) throw new Error("currentDiscardedTile should be assigned");
+
+      const playerIdx = state.persistentState.players.indexOf(player);
+      player.hands.push(state.currentDiscardedTile.tile);
+      PlayerStateManager.revealTile(player, tiles, type);
+
+      state.turn.playerToDeal = playerIdx as 0 | 1 | 2 | 3;
+      // reset player declaration
+      state.declare.playerDeclarations = [];
+      return true;
+    }
+
+    return false;
   }
 
   static dealDice() {
@@ -417,14 +409,5 @@ export class MainStateManager {
 
     // reset player turn
     state.turn.playerToDeal = bankerIdx as 0 | 1 | 2 | 3;
-  }
-
-  static shufflePlayerTiles(state: MainState) {
-    const players = state.persistentState.players;
-    players.forEach((player) => {
-      const modifiedTableTiles = PlayerStateManager.initHand(player, state.tableTiles.toArray());
-      state.tableTiles = new LinkedList(...modifiedTableTiles);
-    });
-    MainStateManager.tileMustbe148(state);
   }
 }

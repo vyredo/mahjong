@@ -1,3 +1,7 @@
+import { LinkedList } from "linked-list-typescript";
+import { MainState } from "./MainState";
+import { PlayerStateManager } from "./PlayerState";
+
 export enum Suit {
   Bamboo = "Bamboo",
   Character = "Character",
@@ -129,5 +133,43 @@ export class TileSet {
     return tiles;
   }
 
+  static tileMustbe148(state: MainState) {
+    const players = state.persistentState.players;
+    const playerTiles = players.map((player) => player.hands.length).reduce((a, b) => a + b, 0);
+    const playerConcealedTiles = players.map((player) => player.revealedTiles.length).reduce((a, b) => a + b, 0);
+    const flowerTiles = players.map((player) => player.flowerTiles.length).reduce((a, b) => a + b, 0);
+    const tableTiles = state.tableTiles.length;
+    const tableDiscardedTiles = state.tableDiscardedTiles.length;
+    const currentDiscardedTile = state.currentDiscardedTile ? 1 : 0;
+
+    if (playerTiles + tableTiles + tableDiscardedTiles + flowerTiles + playerConcealedTiles + currentDiscardedTile != 148) {
+      throw new Error("tileMustbe148");
+    }
+  }
+
+  static shuffleTableTiles(state: MainState) {
+    const tileset = TileSet.tiles.slice();
+    const shuffleTileset = new LinkedList<Tile>();
+    while (tileset.length > 0) {
+      const idx = Math.round(Date.now() + Math.random()) % tileset.length;
+      const tile = tileset.splice(idx, 1)[0];
+      shuffleTileset.append(tile);
+    }
+
+    // change this to linkedlist
+    state.tableTiles = shuffleTileset;
+
+    TileSet.tileMustbe148(state);
+    return shuffleTileset;
+  }
+
+  static shufflePlayerTiles(state: MainState) {
+    const players = state.persistentState.players;
+    players.forEach((player) => {
+      const modifiedTableTiles = PlayerStateManager.initHand(player, state.tableTiles.toArray());
+      state.tableTiles = new LinkedList(...modifiedTableTiles);
+    });
+    TileSet.tileMustbe148(state);
+  }
   constructor() {}
 }
