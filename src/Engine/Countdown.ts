@@ -17,6 +17,7 @@ export enum PhaseType {
   DeclareCountdownEnd = "DeclareCountdownEnd",
   DeclareCountdownStart = "DeclareCountdownStart",
   Gameover = "Gameover",
+  NewGame = "NewGame",
 }
 
 class Timeout {
@@ -104,8 +105,8 @@ export function onExhaustTimeout() {
 }
 
 // ======================== EVENT MAP move to another file ========================
-type EventCallbackParams = { phase: PhaseType; state: MainState; shouldSkip?: boolean };
-type EventCallback = ({ phase, state }: EventCallbackParams) => void;
+export type EventCallbackParams = { phase: PhaseType; state: MainState; shouldSkip?: boolean };
+export type EventCallback = ({ phase, state }: EventCallbackParams) => void;
 const eventMap = new Map<PhaseType, Array<EventCallback>>();
 export const registerEvent = (phase: PhaseType, callback: EventCallback) => {
   const callbacks = eventMap.get(phase);
@@ -115,6 +116,7 @@ export const registerEvent = (phase: PhaseType, callback: EventCallback) => {
     eventMap.set(phase, [callback]);
   }
 };
+
 export const removeEvent = (phase: PhaseType, callback: EventCallback) => {
   const callbacks = eventMap.get(phase);
   if (callbacks) {
@@ -124,9 +126,10 @@ export const removeEvent = (phase: PhaseType, callback: EventCallback) => {
     }
   }
 };
+
 export const emitEvent = (params: EventCallbackParams) => {
   console.log(`"emitEvent", [${params.phase}]`);
-  const callbacks = eventMap.get(params.phase);
+  const callbacks = eventMap.get(params.phase); // change phase, run all callbacks that match the phase
   if (callbacks) {
     callbacks.forEach((callback) => callback(params));
   }

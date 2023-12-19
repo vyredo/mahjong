@@ -1,5 +1,5 @@
 import { PhaseType } from "./Countdown";
-import { EventMainStateManager } from "./EventState";
+import { EventMainStateManager } from "./EventManager";
 import { MainState, MainStateManager } from "./MainState";
 import { TileAction, validDeclarationReturn } from "./TileAction";
 import { Suit, Tile } from "./Tiles";
@@ -17,12 +17,24 @@ export class PlayerState {
 
   isBanker: boolean = false;
   playerWind: "East" | "South" | "West" | "North" | null = null;
-  canDeclare = false;
   validActions: validDeclarationReturn | null = null;
   constructor(public playerConnId = uuidv4()) {}
 }
 
+export enum PlayerEvent {
+  dealTile = "dealTile",
+  getTileFromCollection = "getTileFromCollection",
+  getTileFromDiscardedTable = "getTileFromDiscardedTable",
+  discardTileToTable = "discardTileToTable",
+  declareAction = "declare",
+  revealTile = "revealTile", // pong, chi, kang must be revealed if player pick from table
+  initHand = "initHand",
+  swapTile = "swapTile",
+  findFlowerTile = "findFlowerTile",
+}
+
 export class PlayerStateManager {
+  // auto
   static initHand(p: PlayerState, tableTiles: Tile[]) {
     const takeTile = () => {
       const idx = Date.now() % tableTiles.length;
@@ -50,6 +62,7 @@ export class PlayerStateManager {
     return tableTiles; // after modified
   }
 
+  // auto
   static validateTiles(p: PlayerState) {
     // both revealed and concealed should combine to 13 or 14
     const concealed = p.hands.length;
@@ -66,6 +79,7 @@ export class PlayerStateManager {
     }
   }
 
+  // auto
   static revealFlowerTile(p: PlayerState, flowerTile: Tile) {
     // if flower or animal immediately add to flowerTile
     if (flowerTile.type === Suit.RedFlower || flowerTile.type === Suit.BlackFlower || flowerTile.type === Suit.Animal) {
@@ -76,7 +90,8 @@ export class PlayerStateManager {
     // get new tile from table
   }
 
-  static includeTileFromTable(p: PlayerState, tile: Tile) {
+  // auto
+  static includeTileFromCollection(p: PlayerState, tile: Tile) {
     // if flower or animal immediately add to flowerTile
     if (tile.type === Suit.RedFlower || tile.type === Suit.BlackFlower || tile.type === Suit.Animal) {
       throw new Error("SHould not get flower or animal here");
@@ -86,6 +101,7 @@ export class PlayerStateManager {
     PlayerStateManager.validateTiles(p);
   }
 
+  // manual
   static discardTileToTable(p: PlayerState, state: MainState, tile: Tile) {
     const idx = p.hands.findIndex((t) => t === tile);
     if (idx === -1) {
@@ -102,6 +118,7 @@ export class PlayerStateManager {
     return tile;
   }
 
+  //manual
   static swapTile(p: PlayerState, tile1: Tile, tile2: Tile) {
     const idx1 = p.hands.findIndex((t) => t === tile1);
     const idx2 = p.hands.findIndex((t) => t === tile2);
@@ -113,12 +130,14 @@ export class PlayerStateManager {
     PlayerStateManager.validateTiles(p);
   }
 
+  // manual
   static declareAction(
     p: PlayerState,
     state: MainState,
     type: "hoo" | "pong" | "kang" | "chi" = "chi",
     tiles: [string, string, string] | [string, string, string, string]
   ) {
+    // guard, if phase is not declare start ignore all actions
     if (Countdown.getCurrentPhase() !== PhaseType.DeclareCountdownStart) {
       return;
     }
@@ -138,6 +157,7 @@ export class PlayerStateManager {
 
     const playerIdx = state.persistentState.players.findIndex((p) => p.playerConnId === p.playerConnId) as number;
 
+    // guard idx > 0 and < 4
     if (playerIdx === -1) {
       console.error("playerIdx is -1");
     } else if (playerIdx > 3) {
@@ -147,6 +167,7 @@ export class PlayerStateManager {
     state.declare.playerDeclarations.push({ value, type, tiles, player: p, playerIdx: playerIdx as 0 | 1 | 2 | 3 });
   }
 
+  // auto reveal tile after declartion phase
   static revealTile(p: PlayerState, tilesStr: [string, string, string] | [string, string, string, string], type: "pong" | "kang" | "chi") {
     const tile1idx = p.hands.findIndex((t) => t.name === tilesStr[0]);
     console.log("[REVEALED TILES]", p.name, tilesStr);
@@ -188,11 +209,17 @@ export class PlayerStateManager {
     PlayerStateManager.removeValidActions(p);
   }
 
-  static removeValidActions(p: PlayerState) {
+  // auto
+  private static removeValidActions(p: PlayerState) {
     p.validActions = null;
   }
 
-  static takeTileFromTableAndGiveToPlayer(state: MainState): Tile {
+  // auto
+  public static getTileFromCollection(state: MainState): Tile | void {
+    if (state.phase !== PhaseType.DealCountdownStart) {
+      return;
+    }
+
     if (state.tableTiles.length === 15) {
       throw new Error("game over " + state.tableTiles.length);
     }
@@ -203,13 +230,15 @@ export class PlayerStateManager {
     // if flower or animal immediately add to flowerTile
     if (tile.type === Suit.RedFlower || tile.type === Suit.BlackFlower || tile.type === Suit.Animal) {
       console.log(currentPlayer.name, "takeFlowerTile", tile);
-      EventMainStateManager.emitEvent("takeFlowerTile", state);
       PlayerStateManager.revealFlowerTile(currentPlayer, tile);
-      return PlayerStateManager.takeTileFromTableAndGiveToPlayer(state);
+
+      EventMainStateManager.emitEvent(PlayerEvent.findFlowerTile, state);
+      // TODO: call event here just to inform user that flower tile is taken
+      return PlayerStateManager.getTileFromCollection(state);
     } else {
       console.log(currentPlayer.name, "take tile ", tile);
-      EventMainStateManager.emitEvent("takeTileFromTableAndGiveToPlayer", state);
-      PlayerStateManager.includeTileFromTable(currentPlayer, tile);
+      EventMainStateManager.emitEvent(PlayerEvent.getTileFromCollection, state);
+      PlayerStateManager.includeTileFromCollection(currentPlayer, tile);
     }
 
     PlayerStateManager.validateTiles(currentPlayer);

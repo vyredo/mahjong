@@ -2,17 +2,16 @@ import { MainState } from "./MainState";
 
 export class EventMainStateManager {
   static mapConnIdToWs: Map<string, WebSocket> = new Map();
-  //   static broadcastEvent(event: string, data: MainState, playerConnId: string) {
-  //     const ws = EventStateManager.mapConnIdToWs.get(playerConnId);
-  //     if (!ws) {
-  //       throw new Error(`cannot find ws for ${playerConnId}`);
-  //     }
-
-  //     const msg = JSON.stringify({ event, data });
-  //     ws.send(msg);
-  //   }
 
   static callbacks = new Map<string, Array<(event: string, s: MainState) => void>>();
+  static onAnyEventCallback = (cb: (event: string, s: MainState) => void) => {
+    const callbacks = EventMainStateManager.callbacks.get("ANY");
+    if (callbacks) {
+      callbacks.push(cb);
+    } else {
+      EventMainStateManager.callbacks.set("ANY", [cb]);
+    }
+  };
   static registerCallback(event: string, callback: (event: any, s: MainState) => void) {
     const callbacks = EventMainStateManager.callbacks.get(event);
     if (callbacks) {
@@ -34,6 +33,10 @@ export class EventMainStateManager {
     const callbacks = EventMainStateManager.callbacks.get(event);
     if (callbacks) {
       callbacks.forEach((callback) => callback(event, state));
+    }
+    const anyCallbacks = EventMainStateManager.callbacks.get("ANY");
+    if (anyCallbacks) {
+      anyCallbacks.forEach((callback) => callback(event, state));
     }
   }
 }

@@ -2,17 +2,9 @@ import { Suit, Tile, TileSet, WindSuit, WindType } from "./Tiles";
 import { PlayerState, PlayerStateManager } from "./PlayerState";
 import { LinkedList } from "linked-list-typescript";
 import { v4 as uuidv4 } from "uuid";
-import { EventMainStateManager } from "./EventState";
+import { EventMainStateManager } from "./EventManager";
 import { TileAction } from "./TileAction";
 import * as Countdown from "./Countdown";
-
-enum Phase {
-  Shuffle,
-  Deal, // time for players to deal
-  PostDeal,
-  Declare, // time for players to declare chi or pong or Kang
-  PostDeclare,
-}
 
 interface Declaration {
   // check how many player can declare, if none , then move to next player
@@ -66,7 +58,7 @@ export class MainState {
   tableDiscardedTiles: Tile[] = [];
 
   // phase
-  phase: Phase = Phase.Shuffle;
+  phase: Countdown.PhaseType = Countdown.PhaseType.NewGame;
 
   prevailingWind: WindType = "East";
   bankerPlayer:
@@ -135,7 +127,7 @@ export class MainStateManager {
     Countdown.registerEvent(Countdown.PhaseType.Gameover, () => {});
     EventMainStateManager.emitEvent("init", state);
 
-    // start first game
+    // start first game, refactor the game Phase sequence to be it's own class
     MainStateManager.startFirstGame(state);
   }
 
@@ -206,7 +198,7 @@ export class MainStateManager {
       // take from table for next user
       state.turn.playerToDeal = ((state.turn.playerToDeal + 1) % 4) as 0 | 1 | 2 | 3;
       // getTile for next-player
-      PlayerStateManager.takeTileFromTableAndGiveToPlayer(state);
+      PlayerStateManager.getTileFromCollection(state);
     }
 
     // start countdown for player to deal
