@@ -1,4 +1,4 @@
-import { PlayerState } from "./PlayerState";
+import type { PlayerState } from "./PlayerState";
 import { BambooSuit, CharacterSuit, CircleSuit, DragonSuit, Suit, Tile, WindSuit } from "./Tiles";
 
 enum ValidSuit {
