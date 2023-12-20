@@ -137,7 +137,7 @@ export class PlayerStateManager {
     p: PlayerState,
     state: MainState,
     type: "hoo" | "pong" | "kang" | "chi" = "chi",
-    tiles: [string, string, string] | [string, string, string, string],
+    tiles: [number, number, number] | [number, number, number, number],
     autoDeclare: boolean = false
   ) {
     // guard, if phase is not declare start ignore all actions

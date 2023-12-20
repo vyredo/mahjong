@@ -1,4 +1,3 @@
-import type { PlayerState } from "./PlayerState";
 import { BambooSuit, CharacterSuit, CircleSuit, DragonSuit, Suit, Tile, WindSuit } from "./Tiles";
 
 enum ValidSuit {
@@ -11,9 +10,9 @@ enum ValidSuit {
 
 export type validDeclarationReturn = {
   hoo: boolean;
-  pong: [boolean, [string, string, string] | false];
-  kang: [boolean, [string, string, string, string] | false];
-  chi: [boolean, [string, string, string][]];
+  pong: [boolean, [number, number, number] | false];
+  kang: [boolean, [number, number, number, number] | false];
+  chi: [boolean, [number, number, number][]];
 };
 
 export class TileAction {
@@ -57,8 +56,8 @@ export class TileAction {
   }
 
   findSameTile(nextTile: Tile): {
-    pong: [boolean, [string, string, string] | false];
-    kang: [boolean, [string, string, string, string] | false];
+    pong: [boolean, [number, number, number] | false];
+    kang: [boolean, [number, number, number, number] | false];
   } {
     if (!this.validSuit(nextTile)) {
       return {
@@ -69,19 +68,20 @@ export class TileAction {
 
     const nextTileType = nextTile.type as unknown as ValidSuit;
     let found = 0;
+    // todo: use binary search
     for (const item of this.tiles[nextTileType]) {
-      if (item.value === nextTile.value) {
+      if (item.id === nextTile.id) {
         found++;
       }
     }
 
     return {
-      pong: [found >= 2, found >= 2 && [nextTile.name, nextTile.name, nextTile.name]],
-      kang: [found === 3, found === 3 && [nextTile.name, nextTile.name, nextTile.name, nextTile.name]],
+      pong: [found >= 2, found >= 2 && [nextTile.id, nextTile.id, nextTile.id]],
+      kang: [found === 3, found === 3 && [nextTile.id, nextTile.id, nextTile.id, nextTile.id]],
     };
   }
 
-  findConsecutive(nextTile: Tile): { canChi: boolean; foundTiles: [string, string, string][] } {
+  findConsecutive(nextTile: Tile): { canChi: boolean; foundTiles: [number, number, number][] } {
     if (
       !this.validSuit(nextTile) ||
       // ignore non numeric tiles
@@ -95,26 +95,27 @@ export class TileAction {
     }
 
     const sameTypeTiles: Tile[] = this.tiles[nextTile.type as unknown as ValidSuit];
-    const sorted = sameTypeTiles.sort((a, b) => (a.value as number) - (b.value as number));
+    const sorted = sameTypeTiles.sort((a, b) => (a.id as number) - (b.id as number));
 
     // convert to key-value pair
     const obj = sorted.reduce((prev, curr: Tile) => {
-      prev[curr.value as number] = curr.name;
+      prev[curr.id as number] = curr.id;
       return prev;
-    }, {} as { [key: number]: string });
+    }, {} as { [key: number]: number });
 
-    let foundTiles: [string, string, string][] = [];
+    // todo: use ID, and binary search
+    let foundTiles: [number, number, number][] = [];
     // middle
-    if (obj[(nextTile.value as number) - 1] && obj[(nextTile.value as number) + 1]) {
-      foundTiles.push([nextTile.name, obj[(nextTile.value as number) - 1], obj[(nextTile.value as number) + 1]]);
+    if (obj[(nextTile.id as number) - 1] && obj[(nextTile.id as number) + 1]) {
+      foundTiles.push([nextTile.id, obj[(nextTile.id as number) - 1], obj[(nextTile.id as number) + 1]]);
     }
     // right
-    if (obj[(nextTile.value as number) - 1] && obj[(nextTile.value as number) - 2]) {
-      foundTiles.push([obj[(nextTile.value as number) - 2], obj[(nextTile.value as number) - 1], nextTile.name]);
+    if (obj[(nextTile.id as number) - 1] && obj[(nextTile.id as number) - 2]) {
+      foundTiles.push([obj[(nextTile.id as number) - 2], obj[(nextTile.id as number) - 1], nextTile.id]);
     }
     // left
-    if (obj[(nextTile.value as number) + 1] && obj[(nextTile.value as number) + 2]) {
-      foundTiles.push([nextTile.name, obj[(nextTile.value as number) + 1], obj[(nextTile.value as number) + 2]]);
+    if (obj[(nextTile.id as number) + 1] && obj[(nextTile.id as number) + 2]) {
+      foundTiles.push([nextTile.id, obj[(nextTile.id as number) + 1], obj[(nextTile.id as number) + 2]]);
     }
 
     return {

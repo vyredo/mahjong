@@ -1,14 +1,17 @@
 import { initCountdown } from "./Countdown";
 import { MainState } from "./MainState";
+import { PlayerState } from "./PlayerState";
+import { validDeclarationReturn } from "./TileAction";
 import { Tile } from "./Tiles";
 import { PhaseType } from "./Types";
-console.log("enum PhaseType .>>");
-
-console.log("enum PhaseType", PhaseType);
 interface Metadata {
   shouldSkip?: boolean;
   tileFromCollection?: Tile;
   caller?: string;
+  declarationResult?: {
+    result: validDeclarationReturn;
+    player: PlayerState;
+  };
 }
 export type EventCallbackParams = { phase: string | PhaseType; state: MainState; meta?: Metadata };
 export type EventCallback = ({ phase, state }: EventCallbackParams) => void;

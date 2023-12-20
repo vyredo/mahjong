@@ -11,6 +11,7 @@ export enum PhaseType {
   // action type
   getTileFromCollection = "getTileFromCollection",
   findFlowerTile = "findFlowerTile",
+  validDeclaration = "validDeclaration",
 }
 
 export enum ActionType {}

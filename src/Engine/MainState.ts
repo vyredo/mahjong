@@ -12,7 +12,7 @@ interface Declaration {
   // otherwise wait for timeout
   type: "chi" | "pong" | "kang" | "hoo";
   value: number;
-  tiles?: [string, string, string, string] | [string, string, string];
+  tiles?: [number, number, number, number] | [number, number, number];
   player: PlayerState;
   playerIdx: 0 | 1 | 2 | 3;
 }
@@ -221,7 +221,22 @@ export class MainStateManager {
         state.turn.playerToDeal = ((state.turn.playerToDeal + 1) % 4) as 0 | 1 | 2 | 3;
       }
       // getTile for next-player
-      PlayerStateManager.getTileFromCollection(state);
+      const newTile = PlayerStateManager.getTileFromCollection(state);
+
+      if (!newTile) throw new Error("newTile should be assigned");
+
+      // todo: player can declare hoo, kang before discard
+      const tileAction = new TileAction(state.persistentState.players[state.turn.playerToDeal].hands);
+      const validActions = tileAction.validDeclaration(newTile);
+      if (validActions.kang || validActions.hoo) {
+        EventMainStateManager.emitEvent(PhaseType.validDeclaration, state, {
+          caller: "MainStateManager.DealPhase",
+          declarationResult: {
+            result: validActions,
+            player: state.persistentState.players[state.turn.playerToDeal],
+          },
+        });
+      }
     }
 
     // start countdown for player to deal
@@ -266,10 +281,18 @@ export class MainStateManager {
       if (player === prevOwner) return;
 
       const result = tileAction.validDeclaration(tile);
+
       const canDeclare = result.chi[0] || result.pong[0] || result.kang[0] || result.hoo;
 
       if (canDeclare) {
         player.validActions = result;
+        EventMainStateManager.emitEvent(PhaseType.validDeclaration, state, {
+          caller: "MainStateManager.DeclarationPhase",
+          declarationResult: {
+            result,
+            player,
+          },
+        });
         playerCanDeclare++;
 
         // auto declare the highest value
@@ -281,7 +304,7 @@ export class MainStateManager {
           return;
         }
 
-        let tiles: [string, string, string, string] | [string, string, string];
+        let tiles: [number, number, number, number] | [number, number, number];
         if (result.kang[0] && result.kang[1]) {
           tiles = result.kang[1];
           PlayerStateManager.declareAction(player, state, "kang", tiles, true);
