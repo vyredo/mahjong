@@ -1,10 +1,10 @@
-import { Suit, Tile, TileSet, WindSuit, WindType } from "./Tiles";
+import { Tile, TileSet, WindSuit, WindType } from "./Tiles";
 import { PlayerState, PlayerStateManager } from "./PlayerState";
 import { LinkedList } from "linked-list-typescript";
 import { v4 as uuidv4 } from "uuid";
 import { EventMainStateManager } from "./EventManager";
 import { TileAction } from "./TileAction";
-import * as Countdown from "./Countdown";
+import { PhaseType } from "./Types";
 
 interface Declaration {
   // check how many player can declare, if none , then move to next player
@@ -58,7 +58,7 @@ export class MainState {
   tableDiscardedTiles: Tile[] = [];
 
   // phase
-  phase: Countdown.PhaseType = Countdown.PhaseType.NewGame;
+  phase: PhaseType = PhaseType.NewGame;
 
   prevailingWind: WindType = "East";
   bankerPlayer:
@@ -103,11 +103,12 @@ export class MainStateManager {
       state.persistentState.players.push(player);
     }
 
-    Countdown.registerEvent(Countdown.PhaseType.OrganizeHandsCountdownEnd, ({ state }) => {
+    EventMainStateManager.registerCallback(PhaseType.OrganizeHandsCountdownEnd, ({ state }) => {
+      console.log("here >>>>>>");
       // when countdown is over, then move to deal phase
       MainStateManager.DealPhase({ state, initGame: true });
     });
-    Countdown.registerEvent(Countdown.PhaseType.DealCountdownEnd, ({ state, shouldSkip }) => {
+    EventMainStateManager.registerCallback(PhaseType.DealCountdownEnd, ({ state, shouldSkip }) => {
       console.log(`[DealCountdownEnd], shouldSkip: ${shouldSkip}`);
       if (shouldSkip) {
         // countdown is over, skip player turn
@@ -118,13 +119,13 @@ export class MainStateManager {
       // if player click done, then move to declare phase
       MainStateManager.DeclarationPhase(state);
     });
-    Countdown.registerEvent(Countdown.PhaseType.DeclareCountdownEnd, ({ state }) => {
+    EventMainStateManager.registerCallback(PhaseType.DeclareCountdownEnd, ({ state }) => {
       // countdown declare is over, don't autodeclare.
       // some win condition are automatic, TODO:
       const skipTakeFromTable = MainStateManager.executeHighestDeclaration(state);
       MainStateManager.DealPhase({ state, skipTakeFromTable });
     });
-    Countdown.registerEvent(Countdown.PhaseType.Gameover, () => {});
+    EventMainStateManager.registerCallback(PhaseType.Gameover, () => {});
     EventMainStateManager.emitEvent("init", state);
 
     // start first game, refactor the game Phase sequence to be it's own class
@@ -132,6 +133,8 @@ export class MainStateManager {
   }
 
   static startFirstGame(state: MainState) {
+    // start countdown for player to organize hands
+    EventMainStateManager.emitEvent("firstGame", state);
     MainStateManager.reset(state);
     TileSet.shuffleTableTiles(state);
 
@@ -140,15 +143,11 @@ export class MainStateManager {
     MainStateManager.assignBankerAndResetPlayerTurn({ initFirstBanker: bankerIdx, state });
     TileSet.shufflePlayerTiles(state);
 
-    // start countdown for player to organize hands
-    Countdown.emitEvent({
-      phase: Countdown.PhaseType.OrganizeHandsCountdownStart,
-      state,
-    });
-    EventMainStateManager.emitEvent("firstGame", state);
+    EventMainStateManager.emitEvent(PhaseType.OrganizeHandsCountdownStart, state);
   }
 
   static nextGame(state: MainState) {
+    EventMainStateManager.emitEvent("nextGame", state);
     if (state.persistentState.firstBankerIdx == null) {
       throw new Error("firstBankerIdx should be assigned");
     }
@@ -163,11 +162,7 @@ export class MainStateManager {
     TileSet.shufflePlayerTiles(state);
 
     // start countdown for player to organize hands
-    Countdown.emitEvent({
-      phase: Countdown.PhaseType.OrganizeHandsCountdownStart,
-      state,
-    });
-    EventMainStateManager.emitEvent("nextGame", state);
+    EventMainStateManager.emitEvent(PhaseType.OrganizeHandsCountdownStart, state);
   }
 
   static forceSkipPlayerTurn(state: MainState) {
@@ -182,8 +177,6 @@ export class MainStateManager {
   }
 
   static async DealPhase({ state, initGame, skipTakeFromTable }: { state: MainState; initGame?: boolean; skipTakeFromTable?: boolean }) {
-    EventMainStateManager.emitEvent("DealPhase", state);
-
     // reset
     state.turn.totalTurn++;
 
@@ -202,10 +195,7 @@ export class MainStateManager {
     }
 
     // start countdown for player to deal
-    Countdown.emitEvent({
-      phase: Countdown.PhaseType.DealCountdownStart,
-      state,
-    });
+    EventMainStateManager.emitEvent(PhaseType.DealCountdownStart, state);
   }
 
   static async runPlayerTurnCountdown(state: MainState) {
@@ -275,20 +265,17 @@ export class MainStateManager {
     if (playerCanDeclare === 0) {
       console.log("No player can declare, move to next player");
       // no player can declare, then move to next player
-      Countdown.emitEvent({
-        phase: Countdown.PhaseType.DeclareCountdownEnd,
-        state,
-      });
+      EventMainStateManager.emitEvent(PhaseType.DeclareCountdownEnd, state);
+
       return;
     }
 
-    Countdown.emitEvent({
-      phase: Countdown.PhaseType.DeclareCountdownStart,
-      state,
-    });
+    EventMainStateManager.emitEvent(PhaseType.DeclareCountdownStart, state);
   }
 
   static executeHighestDeclaration(state: MainState) {
+    EventMainStateManager.emitEvent("Execute Declaration", state);
+
     // force skip after countdown is 0
     // check the declaration and player action to declare
     if (state.declare.playerDeclarations.length > 0) {
@@ -356,6 +343,8 @@ export class MainStateManager {
   }
 
   static dealDice() {
+    EventMainStateManager.emitEvent("Deal Dice", null!);
+
     const dice1 = (Math.round(Date.now() + Math.random()) % 6) + 1;
     const dice2 = (Math.round(Date.now() + Math.random()) % 6) + 1;
     const dice3 = (Math.round(Date.now() + Math.random()) % 6) + 1;
@@ -366,6 +355,8 @@ export class MainStateManager {
   }
 
   static assignBankerAndResetPlayerTurn({ initFirstBanker, state }: { initFirstBanker?: number | null; state: MainState }) {
+    EventMainStateManager.emitEvent("Assign Banker", state);
+
     let bankerIdx = null;
 
     // only at beginning of game, we need to assign firstBankerIdx

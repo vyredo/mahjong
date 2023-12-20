@@ -22,9 +22,9 @@ function PlayerHand(player: PlayerState) {
 }
 
 function App() {
-  const [count, setCount] = useState(0);
-
   const mainStateRef = useRef<MainState>();
+  const [, setRerender] = useState<any>();
+  const [phase, setPhase] = useState<string>("");
 
   useEffect(() => {
     const players: PlayerState[] = [
@@ -39,10 +39,15 @@ function App() {
 
     const mainState = (mainStateRef.current = new MainState());
     mainState.persistentState.players = players;
+
+    MainStateManager.init(mainState);
     MainStateManager.startFirstGame(mainState);
-    EventMainStateManager.onAnyEventCallback((event, state) => {
-      console.log(event, state);
+    EventMainStateManager.onAnyEventCallback(({ phase, state }) => {
+      console.log(phase, state);
+      setPhase(phase);
+      setRerender({});
     });
+    setRerender({});
     return () => {
       // unmounted
     };
@@ -53,7 +58,13 @@ function App() {
   return (
     <>
       <div></div>
-      <h1>Vite + React</h1>
+      <div className="table-container">
+        <h3>Table</h3>
+        <div>
+          Declaration phase: <strong>{phase}</strong>
+        </div>
+        <div className="table" style={{ width: 500, height: 500, border: "1px solid black" }}></div>
+      </div>
       <div>
         {mainState.persistentState.players.map((player) => {
           return (

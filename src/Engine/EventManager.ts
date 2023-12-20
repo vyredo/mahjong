@@ -1,10 +1,17 @@
+import { initCountdown } from "./Countdown";
 import { MainState } from "./MainState";
+import { PhaseType } from "./Types";
+console.log("enum PhaseType .>>");
+
+console.log("enum PhaseType", PhaseType);
+export type EventCallbackParams = { phase: string | PhaseType; state: MainState; shouldSkip?: boolean };
+export type EventCallback = ({ phase, state }: EventCallbackParams) => void;
 
 export class EventMainStateManager {
   static mapConnIdToWs: Map<string, WebSocket> = new Map();
 
-  static callbacks = new Map<string, Array<(event: string, s: MainState) => void>>();
-  static onAnyEventCallback = (cb: (event: string, s: MainState) => void) => {
+  static callbacks = new Map<string | PhaseType, Array<EventCallback>>();
+  static onAnyEventCallback = (cb: EventCallback) => {
     const callbacks = EventMainStateManager.callbacks.get("ANY");
     if (callbacks) {
       callbacks.push(cb);
@@ -12,7 +19,8 @@ export class EventMainStateManager {
       EventMainStateManager.callbacks.set("ANY", [cb]);
     }
   };
-  static registerCallback(event: string, callback: (event: any, s: MainState) => void) {
+
+  static registerCallback(event: string, callback: EventCallback) {
     const callbacks = EventMainStateManager.callbacks.get(event);
     if (callbacks) {
       callbacks.push(callback);
@@ -20,7 +28,8 @@ export class EventMainStateManager {
       EventMainStateManager.callbacks.set(event, [callback]);
     }
   }
-  static removeCallback(event: string, callback: (event: string, s: MainState) => void) {
+
+  static removeCallback(event: string, callback: EventCallback) {
     const callbacks = EventMainStateManager.callbacks.get(event);
     if (callbacks) {
       const idx = callbacks.indexOf(callback);
@@ -29,14 +38,32 @@ export class EventMainStateManager {
       }
     }
   }
+
   static emitEvent(event: string, state: MainState) {
+    // emit for specicif event, for now only internal MainState use this
     const callbacks = EventMainStateManager.callbacks.get(event);
     if (callbacks) {
-      callbacks.forEach((callback) => callback(event, state));
+      callbacks.forEach((callback) =>
+        callback({
+          phase: event,
+          state,
+        })
+      );
     }
     const anyCallbacks = EventMainStateManager.callbacks.get("ANY");
+    console.log("event", event, "anyCallbacks", state);
     if (anyCallbacks) {
-      anyCallbacks.forEach((callback) => callback(event, state));
+      anyCallbacks.forEach((callback) =>
+        callback({
+          phase: event,
+          state,
+        })
+      );
+    }
+
+    // start countdown
+    if (event === PhaseType.DealCountdownStart || event === PhaseType.OrganizeHandsCountdownStart || event === PhaseType.DeclareCountdownStart) {
+      initCountdown(event, state);
     }
   }
 }

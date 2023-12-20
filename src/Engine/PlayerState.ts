@@ -1,10 +1,10 @@
-import { PhaseType } from "./Countdown";
 import { EventMainStateManager } from "./EventManager";
-import { MainState, MainStateManager } from "./MainState";
-import { TileAction, validDeclarationReturn } from "./TileAction";
+import { MainState } from "./MainState";
+import { validDeclarationReturn } from "./TileAction";
 import { Suit, Tile } from "./Tiles";
 import { v4 as uuidv4 } from "uuid";
 import * as Countdown from "./Countdown";
+import { PhaseType } from "./Types";
 export class PlayerState {
   name?: string;
 

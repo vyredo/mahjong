@@ -1,4 +1,6 @@
+import { EventCallbackParams, EventMainStateManager } from "./EventManager";
 import type { MainState } from "./MainState";
+import { PhaseType } from "./Types";
 
 export let SETTINGS = {
   declareTimeout: 5,
@@ -8,20 +10,9 @@ export let SETTINGS = {
 export function setSettings(newSettings: typeof SETTINGS) {
   SETTINGS = newSettings;
 }
-
-export enum PhaseType {
-  DealCountdownStart = "DealCountdownStart",
-  DealCountdownEnd = "DealCountdownEnd",
-  OrganizeHandsCountdownStart = "OrganizeHandsCountdownStart",
-  OrganizeHandsCountdownEnd = "OrganizeHandsCountdownEnd",
-  DeclareCountdownEnd = "DeclareCountdownEnd",
-  DeclareCountdownStart = "DeclareCountdownStart",
-  Gameover = "Gameover",
-  NewGame = "NewGame",
-}
-
+console.log(PhaseType);
 class Timeout {
-  phase: PhaseType = PhaseType.Gameover;
+  phase = PhaseType.Gameover;
   currentTime: number = 0;
   currentMainState: MainState | null = null;
 }
@@ -101,37 +92,5 @@ export function onExhaustTimeout() {
   console.log(`onExhaustTimeout executing , [${TIMEOUT.phase}], `);
 
   if (!TIMEOUT.currentMainState) throw new Error("TIMEOUT.currentMainState is null");
-  emitEvent(params);
+  EventMainStateManager.emitEvent(params.phase, params.state);
 }
-
-// ======================== EVENT MAP move to another file ========================
-export type EventCallbackParams = { phase: PhaseType; state: MainState; shouldSkip?: boolean };
-export type EventCallback = ({ phase, state }: EventCallbackParams) => void;
-const eventMap = new Map<PhaseType, Array<EventCallback>>();
-export const registerEvent = (phase: PhaseType, callback: EventCallback) => {
-  const callbacks = eventMap.get(phase);
-  if (callbacks) {
-    callbacks.push(callback);
-  } else {
-    eventMap.set(phase, [callback]);
-  }
-};
-
-export const removeEvent = (phase: PhaseType, callback: EventCallback) => {
-  const callbacks = eventMap.get(phase);
-  if (callbacks) {
-    const idx = callbacks.indexOf(callback);
-    if (idx !== -1) {
-      callbacks.splice(idx, 1);
-    }
-  }
-};
-
-export const emitEvent = (params: EventCallbackParams) => {
-  console.log(`"emitEvent", [${params.phase}]`);
-  const callbacks = eventMap.get(params.phase); // change phase, run all callbacks that match the phase
-  if (callbacks) {
-    callbacks.forEach((callback) => callback(params));
-  }
-  initCountdown(params.phase, params.state);
-};

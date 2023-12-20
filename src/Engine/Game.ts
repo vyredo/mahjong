@@ -1,6 +1,7 @@
 import { MainState, MainStateManager } from "./MainState";
 import * as Countdown from "./Countdown";
 import { PlayerStateManager } from "./PlayerState";
+import { EventCallback, EventMainStateManager, PhaseType } from "./EventManager";
 
 export class Game {
   state = new MainState();
@@ -15,32 +16,32 @@ export class Game {
     Countdown.setSettings(settings);
   }
 
-  onNewGame(callback: Countdown.EventCallback) {
-    Countdown.registerEvent(Countdown.PhaseType.NewGame, callback);
+  onNewGame(callback: EventCallback) {
+    EventMainStateManager.registerCallback(PhaseType.NewGame, callback);
   }
-  onGameEnd(callback: Countdown.EventCallback) {
-    Countdown.registerEvent(Countdown.PhaseType.Gameover, callback);
-  }
-
-  onShuffe(callback: Countdown.EventCallback) {
-    Countdown.registerEvent(Countdown.PhaseType.OrganizeHandsCountdownStart, callback);
-  }
-  removeShuffe(callback: Countdown.EventCallback) {
-    Countdown.removeEvent(Countdown.PhaseType.OrganizeHandsCountdownStart, callback);
+  onGameEnd(callback: EventCallback) {
+    EventMainStateManager.registerCallback(PhaseType.Gameover, callback);
   }
 
-  onDealStart(callback: Countdown.EventCallback) {
-    Countdown.registerEvent(Countdown.PhaseType.DealCountdownStart, callback);
+  onShuffe(callback: EventCallback) {
+    EventMainStateManager.registerCallback(PhaseType.OrganizeHandsCountdownStart, callback);
   }
-  removeDealStart(callback: Countdown.EventCallback) {
-    Countdown.removeEvent(Countdown.PhaseType.DealCountdownStart, callback);
+  removeShuffe(callback: EventCallback) {
+    EventMainStateManager.removeCallback(PhaseType.OrganizeHandsCountdownStart, callback);
   }
 
-  onDealEnd(callback: Countdown.EventCallback) {
-    Countdown.registerEvent(Countdown.PhaseType.DealCountdownEnd, callback);
+  onDealStart(callback: EventCallback) {
+    EventMainStateManager.registerCallback(PhaseType.DealCountdownStart, callback);
   }
-  removeDealEnd(callback: Countdown.EventCallback) {
-    Countdown.removeEvent(Countdown.PhaseType.DealCountdownEnd, callback);
+  removeDealStart(callback: EventCallback) {
+    EventMainStateManager.removeCallback(PhaseType.DealCountdownStart, callback);
+  }
+
+  onDealEnd(callback: EventCallback) {
+    EventMainStateManager.registerCallback(PhaseType.DealCountdownEnd, callback);
+  }
+  removeDealEnd(callback: EventCallback) {
+    EventMainStateManager.removeCallback(PhaseType.DealCountdownEnd, callback);
   }
 
   // player deal
