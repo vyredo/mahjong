@@ -1,12 +1,19 @@
 import { initCountdown } from "./Countdown";
 import { MainState } from "./MainState";
+import { Tile } from "./Tiles";
 import { PhaseType } from "./Types";
 console.log("enum PhaseType .>>");
 
 console.log("enum PhaseType", PhaseType);
-export type EventCallbackParams = { phase: string | PhaseType; state: MainState; shouldSkip?: boolean };
+interface Metadata {
+  shouldSkip?: boolean;
+  tileFromCollection?: Tile;
+  caller?: string;
+}
+export type EventCallbackParams = { phase: string | PhaseType; state: MainState; meta?: Metadata };
 export type EventCallback = ({ phase, state }: EventCallbackParams) => void;
 
+let caller: string[] = [];
 export class EventMainStateManager {
   static mapConnIdToWs: Map<string, WebSocket> = new Map();
 
@@ -39,24 +46,38 @@ export class EventMainStateManager {
     }
   }
 
-  static emitEvent(event: string, state: MainState) {
+  static emitEvent(event: string, state: MainState, meta?: Metadata) {
     // emit for specicif event, for now only internal MainState use this
     const callbacks = EventMainStateManager.callbacks.get(event);
-    if (callbacks) {
-      callbacks.forEach((callback) =>
-        callback({
-          phase: event,
-          state,
-        })
-      );
+
+    // update state.phase
+    if (state) {
+      state.phase = event as PhaseType;
+      // need to concat the caller
     }
+    if (meta?.caller) {
+      caller.push(meta.caller);
+    }
+
     const anyCallbacks = EventMainStateManager.callbacks.get("ANY");
-    console.log("event", event, "anyCallbacks", state);
+    console.log("event", event, "caller: ", JSON.stringify(caller), state);
+    // tell all clients about the event, and the run internal callback
     if (anyCallbacks) {
       anyCallbacks.forEach((callback) =>
         callback({
           phase: event,
           state,
+          meta,
+        })
+      );
+    }
+
+    if (callbacks) {
+      callbacks.forEach((callback) =>
+        callback({
+          phase: event,
+          state,
+          meta,
         })
       );
     }

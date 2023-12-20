@@ -6,8 +6,6 @@ import { v4 as uuidv4 } from "uuid";
 import * as Countdown from "./Countdown";
 import { PhaseType } from "./Types";
 export class PlayerState {
-  name?: string;
-
   hands: Tile[] = []; // concealed hands
   flowerTiles: Tile[] = []; // flower are not part of 13 tiles
   revealedTiles: {
@@ -18,7 +16,11 @@ export class PlayerState {
   isBanker: boolean = false;
   playerWind: "East" | "South" | "West" | "North" | null = null;
   validActions: validDeclarationReturn | null = null;
-  constructor(public playerConnId = uuidv4()) {}
+  constructor(public playerConnId = uuidv4(), public name?: string) {
+    if (!name) {
+      this.name = playerConnId;
+    }
+  }
 }
 
 export enum PlayerEvent {
@@ -135,10 +137,11 @@ export class PlayerStateManager {
     p: PlayerState,
     state: MainState,
     type: "hoo" | "pong" | "kang" | "chi" = "chi",
-    tiles: [string, string, string] | [string, string, string, string]
+    tiles: [string, string, string] | [string, string, string, string],
+    autoDeclare: boolean = false
   ) {
     // guard, if phase is not declare start ignore all actions
-    if (Countdown.getCurrentPhase() !== PhaseType.DeclareCountdownStart) {
+    if (!autoDeclare && Countdown.getCurrentPhase() !== PhaseType.DeclareCountdownStart) {
       return;
     }
 
@@ -186,8 +189,6 @@ export class PlayerStateManager {
       throw new Error("one of tile is not found");
     }
 
-    // remove from hands
-
     const tiles = [tile1, tile2, tile3];
     if (type === "kang") {
       const tile4idx = p.hands.findIndex((t) => t.name === tilesStr[3]);
@@ -216,7 +217,9 @@ export class PlayerStateManager {
 
   // auto
   public static getTileFromCollection(state: MainState): Tile | void {
-    if (state.phase !== PhaseType.DealCountdownStart) {
+    console.log("getTileFromCollection >>>>", state.phase);
+
+    if (state.phase !== PhaseType.DealCountdownStart && state.phase !== PhaseType.findFlowerTile) {
       return;
     }
 
@@ -225,6 +228,11 @@ export class PlayerStateManager {
     }
 
     const tile = state.tableTiles.removeHead();
+    EventMainStateManager.emitEvent(PlayerEvent.getTileFromCollection, state, {
+      tileFromCollection: tile,
+      caller: "getTileFromCollection",
+    });
+
     const currentPlayer = state.persistentState.players[state.turn.playerToDeal];
 
     // if flower or animal immediately add to flowerTile
@@ -232,12 +240,15 @@ export class PlayerStateManager {
       console.log(currentPlayer.name, "takeFlowerTile", tile);
       PlayerStateManager.revealFlowerTile(currentPlayer, tile);
 
-      EventMainStateManager.emitEvent(PlayerEvent.findFlowerTile, state);
+      EventMainStateManager.emitEvent(PlayerEvent.findFlowerTile, state, {
+        tileFromCollection: tile,
+        caller: "findFlowerTile",
+      });
       // TODO: call event here just to inform user that flower tile is taken
       return PlayerStateManager.getTileFromCollection(state);
     } else {
       console.log(currentPlayer.name, "take tile ", tile);
-      EventMainStateManager.emitEvent(PlayerEvent.getTileFromCollection, state);
+
       PlayerStateManager.includeTileFromCollection(currentPlayer, tile);
     }
 

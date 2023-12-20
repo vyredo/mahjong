@@ -7,4 +7,10 @@ export enum PhaseType {
   DeclareCountdownStart = "DeclareCountdownStart",
   Gameover = "Gameover",
   NewGame = "NewGame",
+
+  // action type
+  getTileFromCollection = "getTileFromCollection",
+  findFlowerTile = "findFlowerTile",
 }
+
+export enum ActionType {}

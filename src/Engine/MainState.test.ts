@@ -98,7 +98,7 @@ test("after every 4 game the wind should be changed", () => {
 test("get flower, player hand should be still 13 discard the flower to table", () => {
   const state = new MainState();
   MainStateManager.init(state);
-  MainStateManager.firstGame(state);
+  MainStateManager.startFirstGame(state);
   const firstBankerIdx = state.persistentState.firstBankerIdx;
   const numRotate = new NumberRotate(firstBankerIdx!);
 
@@ -115,7 +115,7 @@ test("get flower, player hand should be still 13 discard the flower to table", (
 test("correctly rotate player for each player turn", () => {
   const state = new MainState();
   MainStateManager.init(state);
-  MainStateManager.firstGame(state);
+  MainStateManager.startFirstGame(state);
   const firstBankerIdx = state.persistentState.firstBankerIdx;
 
   const numRotate = new NumberRotate(firstBankerIdx!);
@@ -141,7 +141,7 @@ test.only("when countdown is 0, player will discard the just picked tile, and mo
   const state = new MainState();
   state.countdown.playerTurnCountdown = 3;
   MainStateManager.init(state);
-  MainStateManager.firstGame(state);
+  MainStateManager.startFirstGame(state);
 
   const firstBankerIdx = state.persistentState.firstBankerIdx;
   expect(state.turn.playerToDeal).toBe(firstBankerIdx);

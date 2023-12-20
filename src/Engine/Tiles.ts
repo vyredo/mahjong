@@ -1,7 +1,15 @@
 import { LinkedList } from "linked-list-typescript";
 import { MainState } from "./MainState";
 import { PlayerStateManager } from "./PlayerState";
+import BambooSheet from "../assets/images/tiles/bamboos.jpg";
+import CharacterSheet from "../assets/images/tiles/characters.jpg";
+import CircleSheet from "../assets/images/tiles/circles.jpg";
+import WindSheet from "../assets/images/tiles/winds.jpg";
+import DragonSheet from "../assets/images/tiles/dragons.jpg";
+import RedBlackFlowerSheet from "../assets/images/tiles/RedBlackFlower.jpg";
+import FlowerAnimal from "../assets/images/tiles/FlowerAnimal.jpg";
 
+console.log("what is BambooSheet", BambooSheet);
 export enum Suit {
   Bamboo = "Bamboo",
   Character = "Character",
@@ -25,72 +33,116 @@ export type WindType = "East" | "South" | "West" | "North";
  * example: 142 -> Bamboo val=4 variant=2
  * example: 412 -> Wind val=East variant=2
  */
-
-export class BambooSuit {
+export class BaseSuit {
   name = "";
+  imageSrc = "";
+  imageIdx = 0;
+  dimension = { width: 0, height: 0 };
+  position: { x: number; y: number; verticalSpace?: number } = { x: 0, y: 0, verticalSpace: 0 };
+}
+
+export class BambooSuit extends BaseSuit {
   type = Suit.Bamboo;
+  imageSrc = BambooSheet;
+  dimension = { width: 78, height: 100 };
+  position = { x: 78.25, y: -2 };
   constructor(public value: to9, public id: number) {
+    super();
     this.name = value + "B";
+    this.imageIdx = value - 1;
   }
 }
 
-export class CharacterSuit {
-  name = "";
+export class CharacterSuit extends BaseSuit {
   type = Suit.Character;
+  imageSrc = CharacterSheet;
+  dimension = { width: 78, height: 100 };
+  position = { x: 79.5, y: -5 };
   constructor(public value: to9, public id: number) {
+    super();
     this.name = value + "C";
+    this.imageIdx = value - 1;
   }
 }
-export class CircleSuit {
-  name = "";
+export class CircleSuit extends BaseSuit {
   type = Suit.Circle;
+  imageSrc = CircleSheet;
+  dimension = { width: 78, height: 100 };
+  position = { x: 78, y: -5 };
   constructor(public value: to9, public id: number) {
-    this.name = value + "C";
+    super();
+    this.name = value + "O";
+    this.imageIdx = value - 1;
   }
 }
 
-export class WindSuit {
-  name = "";
+export class WindSuit extends BaseSuit {
   type = Suit.Wind;
-  static allTypes: WindType[] = ["East", "South", "West", "North"];
+  imageSrc = WindSheet;
+  dimension = { width: 78, height: 100 };
+  position = { x: 76.5, y: -5 };
+  static allTypes: WindType[] = ["East", "West", "South", "North"];
   constructor(public value: WindType, public id: number) {
+    super();
     this.name = value + "W";
+    const valueIdx = WindSuit.allTypes.indexOf(value);
+    this.imageIdx = valueIdx;
   }
 }
 
-export class BlackFlowerSuit {
-  name = "";
+export class BlackFlowerSuit extends BaseSuit {
   type = Suit.BlackFlower;
+  imageSrc = RedBlackFlowerSheet;
+  dimension = { width: 78, height: 100 };
+  position = { x: 79.5, y: -5, verticalSpace: 108 };
   static allTypes = ["Spring", "Summer", "Autumn", "Winter"];
   constructor(public value: "Spring" | "Summer" | "Autumn" | "Winter", public id: number) {
+    super();
     this.name = value + "BF";
+    const valueIdx = BlackFlowerSuit.allTypes.indexOf(value);
+    this.imageIdx = valueIdx;
   }
 }
 
-export class RedFlowerSuit {
-  static allTypes = ["Plum", "Orchid", "Chrysanthemum", "Bamboo"];
-  name = "";
+export class RedFlowerSuit extends BaseSuit {
   type = Suit.RedFlower;
+  imageSrc = FlowerAnimal;
+  dimension = { width: 78, height: 100 };
+  position = { x: 79.5, y: -5, verticalSpace: 108 };
+  static allTypes = ["Plum", "Orchid", "Chrysanthemum", "Bamboo"];
   constructor(public value: "Plum" | "Orchid" | "Chrysanthemum" | "Bamboo", public id: number) {
+    super();
     this.name = value + "RF";
+    const valueIdx = RedFlowerSuit.allTypes.indexOf(value);
+    this.imageIdx = valueIdx;
   }
 }
 
-export class AnimalSuit {
-  static allTypes = ["Rooster", "Cat", "Mouse", "Centipede"];
-  name = "";
+export class AnimalSuit extends BaseSuit {
   type = Suit.Animal;
+  imageSrc = FlowerAnimal;
+  dimension = { width: 78, height: 100, verticalSpace: 108 };
+  position = { x: 79.5, y: -5 };
+  static allTypes = ["Rooster", "Cat", "Mouse", "Centipede"];
   constructor(public value: "Rooster" | "Cat" | "Mouse" | "Centipede", public id: number) {
+    super();
     this.name = value + "AN";
+    const valueIdx = AnimalSuit.allTypes.indexOf(value);
+    this.imageIdx = valueIdx;
   }
 }
 
-export class DragonSuit {
-  static allTypes = ["Red", "Green", "White"];
-  name = "";
+export class DragonSuit extends BaseSuit {
   type = Suit.Dragon;
+  imageSrc = DragonSheet;
+  dimension = { width: 78, height: 100 };
+  position = { x: 77, y: -1 };
+  static allTypes = ["Red", "Green", "White"];
   constructor(public value: "Red" | "Green" | "White", public id: number) {
+    super();
     this.name = value + "D";
+    const valueIdx = DragonSuit.allTypes.indexOf(value);
+    this.imageIdx = valueIdx;
   }
 }
 
