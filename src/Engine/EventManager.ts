@@ -63,20 +63,17 @@ export class EventMainStateManager {
     }
 
     console.log("event", event, "caller: ", JSON.stringify(caller), state);
-    if (state && state.persistentState) {
-      console.log("state", state.persistentState.players.map((p) => p.hands.map((t) => t.id).join(",")).join("\n"));
+    const anyCallbacks = EventMainStateManager.callbacks.get("ANY");
+    // tell all clients about the event, and the run internal callback
+    if (anyCallbacks) {
+      anyCallbacks.forEach((callback) =>
+        callback({
+          phase: event,
+          state,
+          meta,
+        })
+      );
     }
-    // const anyCallbacks = EventMainStateManager.callbacks.get("ANY");
-    // // tell all clients about the event, and the run internal callback
-    // if (anyCallbacks) {
-    //   anyCallbacks.forEach((callback) =>
-    //     callback({
-    //       phase: event,
-    //       state,
-    //       meta,
-    //     })
-    //   );
-    // }
 
     if (callbacks) {
       callbacks.forEach((callback) =>

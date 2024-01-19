@@ -163,7 +163,6 @@ function App() {
 
   if (!mainStateRef.current) return null;
   const mainState = mainStateRef.current as MainState;
-  console.log(mainState);
   return (
     <>
       <div></div>
@@ -174,7 +173,7 @@ function App() {
         </div>
         <div className="UI" style={{ display: "flex" }}>
           <div className="table" style={{ width: 500, height: 500, border: "1px solid black" }}>
-            <div>Tile Taken from collection</div>
+            <div>Tile Taken from collection for player {mainState.turn.playerToDeal + 1}</div>
             {tileFromCollection && <TileDiv tile={tileFromCollection} />}
 
             <div>
