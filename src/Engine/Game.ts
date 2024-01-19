@@ -1,7 +1,8 @@
 import { MainState, MainStateManager } from "./MainState";
 import * as Countdown from "./Countdown";
 import { PlayerStateManager } from "./PlayerState";
-import { EventCallback, EventMainStateManager, PhaseType } from "./EventManager";
+import { EventCallback, EventMainStateManager } from "./EventManager";
+import { PhaseType } from "./Types";
 
 export class Game {
   state = new MainState();

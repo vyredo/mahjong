@@ -59,7 +59,7 @@ const TileDiv: React.FC<{ tile: Tile; canSelect?: boolean; onSelected?: (t: Tile
 };
 
 function PlayerHand(player: PlayerState) {
-  console.log("PLAYER HAND >>>> ", player);
+  console.log("PLAYER HAND >>>> ", JSON.stringify(player.hands.map((t) => t.id)));
 
   const [selectedTiles, setSelectedTiles] = useState<Tile[]>([]);
 
@@ -76,9 +76,9 @@ function PlayerHand(player: PlayerState) {
       <div>
         <p>Concealed Tile</p>
         <div style={{ display: "flex", gap: 5, margin: 10 }}>
-          {player.hands.map((tile) => (
+          {player.hands.map((tile, index) => (
             <TileDiv
-              key={tile.id}
+              key={tile.id + index}
               tile={tile}
               selectedTile={selectedTiles[0]}
               canSelect={true}
@@ -96,8 +96,8 @@ function PlayerHand(player: PlayerState) {
           {player.revealedTiles.map(({ tiles, type }) => (
             <>
               <div>{type}</div>
-              {tiles.map((t) => (
-                <TileDiv key={t.id} tile={t} />
+              {tiles.map((t, index) => (
+                <TileDiv key={t.id + index} tile={t} />
               ))}
             </>
           ))}
@@ -107,8 +107,8 @@ function PlayerHand(player: PlayerState) {
       <div>
         <p>Flower Tile</p>
         <div style={{ display: "flex", gap: 5, margin: 10 }}>
-          {player.flowerTiles.map((t) => (
-            <TileDiv key={t.id} tile={t} />
+          {player.flowerTiles.map((t, idx) => (
+            <TileDiv key={t.id + idx} tile={t} />
           ))}
         </div>
       </div>
@@ -144,7 +144,8 @@ function App() {
     if (HAS_RUN) return;
 
     HAS_RUN = true;
-    mainStateRef.current = startGame();
+    // @ts-expect-error asdf, todo: remove this
+    window.mainState = mainStateRef.current = startGame();
     EventMainStateManager.onAnyEventCallback(({ phase, state, meta }) => {
       if (phase === PhaseType.getTileFromCollection) {
         console.log("what is current tile from collection", meta?.tileFromCollection);
@@ -171,31 +172,33 @@ function App() {
         <div>
           Declaration phase: <strong>{phase}</strong>
         </div>
-        <div className="table" style={{ width: 500, height: 500, border: "1px solid black" }}>
-          <div>Tile Taken from collection</div>
-          {tileFromCollection && <TileDiv tile={tileFromCollection} />}
+        <div className="UI" style={{ display: "flex" }}>
+          <div className="table" style={{ width: 500, height: 500, border: "1px solid black" }}>
+            <div>Tile Taken from collection</div>
+            {tileFromCollection && <TileDiv tile={tileFromCollection} />}
 
-          <div>
-            {mainState.currentDiscardedTile?.tile && (
-              <>
-                <div>Tile Discarded from player ${mainState.turn.playerToDeal}</div>
-                <TileDiv tile={mainState.currentDiscardedTile.tile} />
-              </>
-            )}
+            <div>
+              {mainState.currentDiscardedTile?.tile && (
+                <>
+                  <div>Tile Discarded from player ${mainState.turn.playerToDeal}</div>
+                  <TileDiv tile={mainState.currentDiscardedTile.tile} />
+                </>
+              )}
+            </div>
+          </div>
+          <div className="player-hands">
+            {mainState.persistentState.players.map((player) => {
+              return (
+                <div key={player.playerConnId}>
+                  <div>
+                    {player.name ?? player.playerConnId} <span>total hand: {player.hands.length}</span>
+                  </div>
+                  <PlayerHand {...player} />
+                </div>
+              );
+            })}
           </div>
         </div>
-      </div>
-      <div>
-        {mainState.persistentState.players.map((player) => {
-          return (
-            <div key={player.playerConnId}>
-              <div>
-                {player.name ?? player.playerConnId} <span>total hand: {player.hands.length}</span>
-              </div>
-              <PlayerHand {...player} />
-            </div>
-          );
-        })}
       </div>
     </>
   );

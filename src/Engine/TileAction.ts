@@ -1,3 +1,4 @@
+import { hooRules } from "./HooRule";
 import { BambooSuit, CharacterSuit, CircleSuit, DragonSuit, Suit, Tile, WindSuit } from "./Tiles";
 
 enum ValidSuit {
@@ -16,6 +17,7 @@ export type validDeclarationReturn = {
 };
 
 export class TileAction {
+  allTiles: Tile[] = [];
   tiles: {
     [key in keyof typeof ValidSuit]: any[];
   } = {
@@ -27,6 +29,7 @@ export class TileAction {
   };
 
   constructor(tiles: Tile[]) {
+    this.allTiles = tiles;
     for (const tile of tiles) {
       if (tile.type === Suit.Dragon) this.tiles[ValidSuit.Dragon].push(tile as DragonSuit);
       else if (tile.type === Suit.Character) this.tiles[ValidSuit.Character].push(tile as CharacterSuit);
@@ -40,6 +43,7 @@ export class TileAction {
   validDeclaration(nextTile: Tile): validDeclarationReturn {
     const sameTile = this.findSameTile(nextTile);
     const consecutive = this.findConsecutive(nextTile);
+    // const hoo = this.canHoo(nextTile);
 
     return {
       // todo; check for hoo
@@ -124,7 +128,18 @@ export class TileAction {
     };
   }
 
-  canHoo() {
+  canHoo(nextTile: Tile) {
     // TODO: rules are very complex
+    let hoo = false;
+    Object.keys(hooRules).forEach((key) => {
+      console.log(key, hooRules[key as keyof typeof hooRules]);
+      const { title, checkFunc } = hooRules[key as keyof typeof hooRules];
+      let points = 0;
+      // todo: point calculation based on Pong of dragons, pong of wind that match player wind, flower that match player turn, animals
+
+      if (checkFunc(nextTile, this.allTiles, points)) {
+        hoo = true;
+      }
+    });
   }
 }

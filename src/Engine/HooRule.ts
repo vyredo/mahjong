@@ -13,7 +13,7 @@ const isWindOrDragon = (tile: Tile) => {
   return tile.type === Suit.Wind || tile.type === Suit.Dragon;
 };
 
-const hooRules = {
+export const hooRules = {
   "All Chows": {
     title: "All Chows",
     // point is calculated by wind that match player, pong/kang dragon, flower that match player, animal
@@ -70,8 +70,7 @@ const hooRules = {
     title: "Four Great Blessing",
     // point is calculated by wind that match player, pong/kang dragon, flower that match player, animal
     checkFunc: (nextTile: Tile, tiles: Tile[]) => {
-      tiles.push(nextTile);
-      const tileAction = new TileAction(tiles);
+      const tileAction = new TileAction([...tiles, nextTile]);
       if (tileAction.tiles.Wind.length < 12) return;
       // must have 4 pong/kang
       let foundPongOrKang = 0;
@@ -300,7 +299,7 @@ const hooRules = {
       const clonedTiles = [...tiles, nextTile].sort((a, b) => a.id - b.id);
       let result: Tile[] = [];
 
-      let hasDuplicate = false;
+      let has1Duplicate = false;
       while (clonedTiles.length > 0) {
         const tile = clonedTiles.pop();
         if (!tile) return false;
@@ -308,20 +307,22 @@ const hooRules = {
 
         const idx = clonedTiles.findIndex((t) => t.id === tile.id);
         if (idx >= 0) {
-          if (hasDuplicate) return false;
-          // found 1 duplicate is fine,
-          hasDuplicate = true;
+          // already has 1 duplicate, so return false for next duplicate
+          if (has1Duplicate) return false;
+          has1Duplicate = true;
           // just remove the other duplicate and check the rest
           clonedTiles.splice(idx, 1);
         }
 
-        if (result.length % 2 === 0) {
+        if (result.length && result.length % 2 === 0) {
           // get last tile
           const lastTile = result[result.length - 1];
           if (lastTile.name === "1B" && tile.name !== "9B") return false;
           if (lastTile.name === "1C" && tile.name !== "9C") return false;
           if (lastTile.name === "1O" && tile.name !== "9O") return false;
         }
+
+        result.push(tile);
       }
 
       return true;
@@ -332,14 +333,14 @@ const hooRules = {
 
   "Half Color": {
     title: "Half Color",
+    checkFunc: (nextTile: Tile, tiles: Tile[]) => {},
   },
 
   "Full Color": {
     title: "Full Color", // this is hard
     // point is calculated by wind that match player, pong/kang dragon, flower that match player, animal
     checkFunc: (nextTile: Tile, tiles: Tile[]) => {
-      tiles.push(nextTile);
-      const tileAction = new TileAction(tiles);
+      const tileAction = new TileAction([...tiles, nextTile]);
       const allBamboo = tileAction.tiles.Bamboo.length === 14;
       const allCharacter = tileAction.tiles.Character.length === 14;
       const allCircle = tileAction.tiles.Circle.length === 14;

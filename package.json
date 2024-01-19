@@ -16,16 +16,17 @@
     "preset": "ts-jest"
   },
   "dependencies": {
+    "linked-list-typescript": "^1.0.15",
+    "p-throttle": "^6.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "linked-list-typescript": "^1.0.15",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/jest": "^29.5.11",
-    "@types/uuid": "^9.0.7",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
+    "@types/uuid": "^9.0.7",
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
     "@vitejs/plugin-react": "^4.2.1",

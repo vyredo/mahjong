@@ -50,7 +50,6 @@ export function initCountdown(phase: PhaseType, state: MainState) {
   state.phase = phase;
   TIMEOUT.currentMainState = state;
   console.log(`initCountdown [${phase}]  ${TIMEOUT.currentTime}`);
-  debugger;
 
   const id = Date.now();
   if (id > TIMEOUT.currentTimeoutId) {
@@ -72,7 +71,6 @@ function runCountdown(id: number) {
   }
 
   console.log(`runnningTimeout ${id} [${PhaseType[TIMEOUT.phase]}] ${TIMEOUT.currentTime}`);
-  debugger;
   cancelTimeout();
   timeoutRef = setTimeout(() => {
     TIMEOUT.currentTime -= 1;
@@ -87,8 +85,6 @@ export function onExhaustTimeout(id: number) {
     return;
   }
   console.log(`onExhaustTimeout , [${TIMEOUT.phase}],  ${id}`);
-  debugger;
-
   if (!TIMEOUT.currentMainState) throw new Error("TIMEOUT.currentMainState is null");
 
   // cancel all timeout if any

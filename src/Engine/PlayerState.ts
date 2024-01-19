@@ -5,7 +5,10 @@ import { Suit, Tile } from "./Tiles";
 import { v4 as uuidv4 } from "uuid";
 import * as Countdown from "./Countdown";
 import { PhaseType } from "./Types";
+
 export class PlayerState {
+  points: number = 0;
+  handSet = new Set<number>();
   hands: Tile[] = []; // concealed hands
   flowerTiles: Tile[] = []; // flower are not part of 13 tiles
   revealedTiles: {
@@ -15,6 +18,7 @@ export class PlayerState {
 
   isBanker: boolean = false;
   playerWind: "East" | "South" | "West" | "North" | null = null;
+  playerTempTurn: 0 | 1 | 2 | 3 | null = null;
   validActions: validDeclarationReturn | null = null;
   constructor(public playerConnId = uuidv4(), public name?: string) {
     if (!name) {
@@ -48,7 +52,11 @@ export class PlayerStateManager {
         takeTile();
         return;
       }
-
+      if (p.handSet.has(tile.id)) {
+        console.error("tile already included");
+        throw new Error("tile already included!!!");
+      }
+      p.handSet.add(tile.id);
       p.hands.push(tile);
     };
 
@@ -75,9 +83,38 @@ export class PlayerStateManager {
 
     if (total !== 13 && total !== 14) {
       console.log(`ERROR >> revealed and concealed should combine to 13 or 14, ${p.name} has ${total} tiles`);
+      console.log(p.hands);
       // console.log(p);
       // console.log("revealed", JSON.stringify(p.revealedTiles));
       throw new Error(`revealed and concealed should combine to 13 or 14, ${p.name} has ${total} tiles`);
+    }
+  }
+
+  /**
+   * Points is required to declare Hoo, Singapore Mahjong rules is at least 1 point
+   * TODO: in future, maybe HooRules will have points checkers instead of this
+   * @param p
+   * @param tiles
+   */
+  static checkPoints(p: PlayerState, tiles: Tile[]) {
+    if (tiles.length === 1 && (tiles[0].type === Suit.Animal || tiles[0].type === Suit.BlackFlower || tiles[0].type === Suit.RedFlower)) {
+      if (tiles[0].type === Suit.Animal) {
+        // animal is 1 point
+        p.points += 1;
+      } else if (tiles[0].type === Suit.BlackFlower) {
+        // flower must match player turn
+        tiles[0].imageIdx === p.playerTempTurn;
+      }
+    }
+
+    // check for pong of dragon
+    if (tiles.length >= 3 && tiles[0].type === Suit.Dragon) {
+      p.points += 1;
+    }
+
+    // check for pong of wind, must match player wind
+    if (tiles.length >= 3 && tiles[0].type === Suit.Wind && p.playerWind && tiles[0].name.startsWith(p.playerWind)) {
+      p.points += 1;
     }
   }
 
@@ -87,6 +124,10 @@ export class PlayerStateManager {
     if (flowerTile.type === Suit.RedFlower || flowerTile.type === Suit.BlackFlower || flowerTile.type === Suit.Animal) {
       p.flowerTiles.push(flowerTile);
     }
+
+    // check for points here
+    PlayerStateManager.checkPoints(p, [flowerTile]);
+
     PlayerStateManager.validateTiles(p);
 
     // get new tile from table
@@ -98,8 +139,15 @@ export class PlayerStateManager {
     if (tile.type === Suit.RedFlower || tile.type === Suit.BlackFlower || tile.type === Suit.Animal) {
       throw new Error("SHould not get flower or animal here");
     }
-
+    if (p.handSet.has(tile.id)) {
+      console.error("tile already included");
+      throw new Error("tile already included!!!");
+    }
+    console.log("before pushing tile check hand", JSON.stringify(p.hands.map((t) => t.id)));
+    p.handSet.add(tile.id);
     p.hands.push(tile);
+
+    console.log("after pushing tile check hand", JSON.stringify(p.hands.map((t) => t.id)));
     PlayerStateManager.validateTiles(p);
   }
 
@@ -171,16 +219,16 @@ export class PlayerStateManager {
   }
 
   // auto reveal tile after declartion phase
-  static revealTile(p: PlayerState, tilesStr: [string, string, string] | [string, string, string, string], type: "pong" | "kang" | "chi") {
-    const tile1idx = p.hands.findIndex((t) => t.name === tilesStr[0]);
-    console.log("[REVEALED TILES]", p.name, tilesStr);
+  static revealTile(p: PlayerState, tilesid: [number, number, number] | [number, number, number, number], type: "pong" | "kang" | "chi") {
+    const tile1idx = p.hands.findIndex((t) => t.id === tilesid[0]);
+    console.log("[REVEALED TILES]", p.name, tilesid);
 
     const tile1 = p.hands.splice(tile1idx, 1)[0];
     console.log("tile1idx", tile1idx, p.hands.length);
-    const tile2idx = p.hands.findIndex((t) => t.name === tilesStr[1]);
+    const tile2idx = p.hands.findIndex((t) => t.id === tilesid[1]);
     const tile2 = p.hands.splice(tile2idx, 1)[0];
     console.log("tile2idx", tile2idx, p.hands.length);
-    const tile3idx = p.hands.findIndex((t) => t.name === tilesStr[2]);
+    const tile3idx = p.hands.findIndex((t) => t.id === tilesid[2]);
     const tile3 = p.hands.splice(tile3idx, 1)[0];
 
     console.log("tile3idx", tile3idx, p.hands.length);
@@ -191,10 +239,15 @@ export class PlayerStateManager {
 
     const tiles = [tile1, tile2, tile3];
     if (type === "kang") {
-      const tile4idx = p.hands.findIndex((t) => t.name === tilesStr[3]);
+      const tile4idx = p.hands.findIndex((t) => t.id === tilesid[3]);
       if (tile4idx === -1) throw new Error("one of tile is not found");
       const tile4 = p.hands.splice(tile4idx, 1)[0];
       tiles.push(tile4);
+    }
+
+    // checkpoint
+    if (type === "pong" || type === "kang") {
+      PlayerStateManager.checkPoints(p, tiles);
     }
 
     // add to revealed
@@ -217,27 +270,30 @@ export class PlayerStateManager {
 
   // auto
   public static getTileFromCollection(state: MainState): Tile | void {
-    console.log("getTileFromCollection >>>>", state.phase);
+    console.log("player.PlayerState getTileFromCollection >>>>", state.phase);
 
     if (state.phase !== PhaseType.DealCountdownStart && state.phase !== PhaseType.findFlowerTile) {
       return;
     }
 
+    // last tile is 15, then game over
     if (state.tableTiles.length === 15) {
       throw new Error("game over " + state.tableTiles.length);
     }
 
     const tile = state.tableTiles.removeHead();
+    console.log("player.PlayerState removeHead >>> ", tile);
     EventMainStateManager.emitEvent(PlayerEvent.getTileFromCollection, state, {
       tileFromCollection: tile,
       caller: "getTileFromCollection",
     });
 
     const currentPlayer = state.persistentState.players[state.turn.playerToDeal];
+    console.log("player.PlayerState currentPlayer >>> ", currentPlayer);
 
     // if flower or animal immediately add to flowerTile
     if (tile.type === Suit.RedFlower || tile.type === Suit.BlackFlower || tile.type === Suit.Animal) {
-      console.log(currentPlayer.name, "takeFlowerTile", tile);
+      console.log(currentPlayer.name, "player.PlayerState takeFlowerTile", tile);
       PlayerStateManager.revealFlowerTile(currentPlayer, tile);
 
       EventMainStateManager.emitEvent(PlayerEvent.findFlowerTile, state, {
@@ -247,7 +303,7 @@ export class PlayerStateManager {
       // TODO: call event here just to inform user that flower tile is taken
       return PlayerStateManager.getTileFromCollection(state);
     } else {
-      console.log(currentPlayer.name, "take tile ", tile);
+      console.log(currentPlayer.name, "player.PlayerState take tile ", tile);
 
       PlayerStateManager.includeTileFromCollection(currentPlayer, tile);
     }

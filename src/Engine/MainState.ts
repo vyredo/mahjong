@@ -107,16 +107,12 @@ export class MainStateManager {
     }
 
     EventMainStateManager.registerCallback(PhaseType.OrganizeHandsCountdownEnd, ({ state }) => {
-      debugger;
-
       console.log("callback for OrganizeHandsCountdownEnd >>>>>>");
       // when countdown is over, then move to deal phase
       state.phase = PhaseType.DealCountdownStart;
       MainStateManager.DealPhase({ state, initGame: true });
     });
     EventMainStateManager.registerCallback(PhaseType.DealCountdownEnd, ({ state, meta }) => {
-      debugger;
-
       const shouldSkip = meta?.shouldSkip ?? false;
       console.log(`[DealCountdownEnd], shouldSkip: ${shouldSkip}`);
       if (shouldSkip) {
@@ -131,8 +127,6 @@ export class MainStateManager {
       MainStateManager.DeclarationPhase(state);
     });
     EventMainStateManager.registerCallback(PhaseType.DeclareCountdownEnd, ({ state }) => {
-      debugger;
-
       // countdown declare is over, don't autodeclare.
       state.phase = PhaseType.DealCountdownStart;
 
@@ -202,8 +196,6 @@ export class MainStateManager {
   static async DealPhase({ state, initGame, skipTakeFromTable }: { state: MainState; initGame?: boolean; skipTakeFromTable?: boolean }) {
     // reset
     state.phase = PhaseType.DealCountdownStart;
-    debugger;
-
     console.log("deal countdown start", state.phase);
     state.turn.totalTurn++;
 
@@ -266,8 +258,6 @@ export class MainStateManager {
   }
 
   static async DeclarationPhase(state: MainState) {
-    debugger;
-
     state.phase = PhaseType.DeclareCountdownStart;
     const discardTile = state.currentDiscardedTile;
     if (!discardTile) throw new Error("discardTile should be assigned");
@@ -322,6 +312,11 @@ export class MainStateManager {
       }
     });
 
+    console.log(
+      "PLAYER CAN DECLARE",
+      state.persistentState.players.map((p) => p.hands.length)
+    );
+
     if (playerCanDeclare === 0) {
       console.log("No player can declare, move to next player");
       // no player can declare, then move to next player
@@ -354,7 +349,6 @@ export class MainStateManager {
       const KangDeclaration: Declaration[] = [];
       const PongDeclaration: Declaration[] = [];
       const ChiDeclaration: Declaration[] = [];
-      debugger;
       state.declare.playerDeclarations.forEach((declaration) => {
         if (declaration.type === "kang") {
           KangDeclaration.push(declaration);
@@ -460,6 +454,7 @@ export class MainStateManager {
       const player = players[i];
       const windIdx = (i - bankerIdx + 4) % 4;
       player.playerWind = WindSuit.allTypes[windIdx];
+      player.playerTempTurn = i as 0 | 1 | 2 | 3;
     }
 
     // reset player turn
