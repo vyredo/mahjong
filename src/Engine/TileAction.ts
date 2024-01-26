@@ -43,7 +43,7 @@ export class TileAction {
   validDeclaration(nextTile: Tile): validDeclarationReturn {
     const sameTile = this.findSameTile(nextTile);
     const consecutive = this.findConsecutive(nextTile);
-    // const hoo = this.canHoo(nextTile);
+    const hoo = this.canHoo(nextTile);
 
     return {
       // todo; check for hoo

@@ -72,10 +72,10 @@ export class MainState {
   stateHistories: MainState[] = [];
 }
 
-export class MainStateManager {
-  static countdownTimeout = 0;
+class MainStateManagerStatic {
+  countdownTimeout = 0;
 
-  static reset(state: MainState) {
+  reset(state: MainState) {
     // MainStateManager.resetPlayerCountdown(state.countdown.playerBeforeFirstTurnCountdown);
     const persistentState = { ...state.persistentState };
     state = new MainState();
@@ -96,7 +96,7 @@ export class MainStateManager {
     return state;
   }
 
-  static init(state: MainState) {
+  init(state: MainState) {
     console.log("INIT >>> MainState");
     // create players and tiles
     TileSet.init();
@@ -110,21 +110,21 @@ export class MainStateManager {
       console.log("callback for OrganizeHandsCountdownEnd >>>>>>");
       // when countdown is over, then move to deal phase
       state.phase = PhaseType.DealCountdownStart;
-      MainStateManager.DealPhase({ state, initGame: true });
+      this.DealPhase({ state, initGame: true });
     });
     EventMainStateManager.registerCallback(PhaseType.DealCountdownEnd, ({ state, meta }) => {
       const shouldSkip = meta?.shouldSkip ?? false;
       console.log(`[DealCountdownEnd], shouldSkip: ${shouldSkip}`);
       if (shouldSkip) {
         // countdown is over, skip player turn
-        MainStateManager.forceSkipPlayerTurn(state);
+        this.forceSkipPlayerTurn(state);
       }
 
       console.log("running DealPhase");
       state.phase = PhaseType.DeclareCountdownStart;
 
       // if player click done, then move to declare phase
-      MainStateManager.DeclarationPhase(state);
+      this.DeclarationPhase(state);
     });
     EventMainStateManager.registerCallback(PhaseType.DeclareCountdownEnd, ({ state }) => {
       // countdown declare is over, don't autodeclare.
@@ -132,7 +132,7 @@ export class MainStateManager {
 
       // some win condition are automatic, TODO:
       const skipTakeFromTable = MainStateManager.executeHighestDeclaration(state);
-      MainStateManager.DealPhase({ state, skipTakeFromTable });
+      this.DealPhase({ state, skipTakeFromTable });
     });
     EventMainStateManager.registerCallback(PhaseType.Gameover, () => {});
 
@@ -141,15 +141,15 @@ export class MainStateManager {
     });
   }
 
-  static startFirstGame(state: MainState) {
+  startFirstGame(state: MainState) {
     // start countdown for player to organize hands
 
-    MainStateManager.reset(state);
+    this.reset(state);
     TileSet.shuffleTableTiles(state);
 
     const dice = MainStateManager.dealDice();
     const bankerIdx = dice.total % 4;
-    MainStateManager.assignBankerAndResetPlayerTurn({ initFirstBanker: bankerIdx, state });
+    this.assignBankerAndResetPlayerTurn({ initFirstBanker: bankerIdx, state });
     TileSet.shufflePlayerTiles(state);
 
     EventMainStateManager.emitEvent(PhaseType.OrganizeHandsCountdownStart, state, {
@@ -157,7 +157,7 @@ export class MainStateManager {
     });
   }
 
-  static nextGame(state: MainState) {
+  nextGame(state: MainState) {
     EventMainStateManager.emitEvent("nextGame", state, {
       caller: "MainStateManager.nextGame",
     });
@@ -168,10 +168,10 @@ export class MainStateManager {
     // persistanceState should not be reset
     ++state.persistentState.gameTotalRound;
 
-    MainStateManager.reset(state);
+    this.reset(state);
     TileSet.shuffleTableTiles(state);
 
-    MainStateManager.assignBankerAndResetPlayerTurn({ state });
+    this.assignBankerAndResetPlayerTurn({ state });
     TileSet.shufflePlayerTiles(state);
 
     // start countdown for player to organize hands
@@ -180,7 +180,7 @@ export class MainStateManager {
     });
   }
 
-  static forceSkipPlayerTurn(state: MainState) {
+  forceSkipPlayerTurn(state: MainState) {
     // skip current player
     const player = state.persistentState.players[state.turn.playerToDeal];
     const lastTile = player.hands[player.hands.length - 1];
@@ -193,10 +193,9 @@ export class MainStateManager {
     });
   }
 
-  static async DealPhase({ state, initGame, skipTakeFromTable }: { state: MainState; initGame?: boolean; skipTakeFromTable?: boolean }) {
+  async DealPhase({ state, initGame, skipTakeFromTable }: { state: MainState; initGame?: boolean; skipTakeFromTable?: boolean }) {
     // reset
     state.phase = PhaseType.DealCountdownStart;
-    console.log("deal countdown start", state.phase);
     state.turn.totalTurn++;
 
     // next-player
@@ -237,13 +236,13 @@ export class MainStateManager {
     });
   }
 
-  static async runPlayerTurnCountdown(state: MainState) {
+  async runPlayerTurnCountdown(state: MainState) {
     return new Promise((resolve) => {
       state.turn.countdown--;
       if (state.turn.countdown >= 0) {
-        clearTimeout(MainStateManager.countdownTimeout);
-        MainStateManager.countdownTimeout = setTimeout(() => {
-          MainStateManager.runPlayerTurnCountdown(state);
+        clearTimeout(this.countdownTimeout);
+        this.countdownTimeout = setTimeout(() => {
+          this.runPlayerTurnCountdown(state);
           resolve(null);
           // check valid move for each player
         }, 1000) as unknown as number;
@@ -251,13 +250,13 @@ export class MainStateManager {
       } else {
         // force skip after countdown is 0
         resolve(null);
-        clearTimeout(MainStateManager.countdownTimeout);
-        MainStateManager.forceSkipPlayerTurn(state);
+        clearTimeout(this.countdownTimeout);
+        this.forceSkipPlayerTurn(state);
       }
     });
   }
 
-  static async DeclarationPhase(state: MainState) {
+  private async DeclarationPhase(state: MainState) {
     state.phase = PhaseType.DeclareCountdownStart;
     const discardTile = state.currentDiscardedTile;
     if (!discardTile) throw new Error("discardTile should be assigned");
@@ -312,11 +311,6 @@ export class MainStateManager {
       }
     });
 
-    console.log(
-      "PLAYER CAN DECLARE",
-      state.persistentState.players.map((p) => p.hands.length)
-    );
-
     if (playerCanDeclare === 0) {
       console.log("No player can declare, move to next player");
       // no player can declare, then move to next player
@@ -334,7 +328,7 @@ export class MainStateManager {
     });
   }
 
-  static executeHighestDeclaration(state: MainState) {
+  private executeHighestDeclaration(state: MainState) {
     EventMainStateManager.emitEvent("Execute Declaration", state, {
       caller: "MainStateManager.executeHighestDeclaration",
     });
@@ -404,7 +398,7 @@ export class MainStateManager {
     return false;
   }
 
-  static dealDice() {
+  private dealDice() {
     EventMainStateManager.emitEvent("Deal Dice", null!, {
       caller: "MainStateManager.dealDice",
     });
@@ -418,7 +412,7 @@ export class MainStateManager {
     };
   }
 
-  static assignBankerAndResetPlayerTurn({ initFirstBanker, state }: { initFirstBanker?: number | null; state: MainState }) {
+  private assignBankerAndResetPlayerTurn({ initFirstBanker, state }: { initFirstBanker?: number | null; state: MainState }) {
     EventMainStateManager.emitEvent("Assign Banker", state, {
       caller: "MainStateManager.assignBankerAndResetPlayerTurn",
     });
@@ -461,3 +455,5 @@ export class MainStateManager {
     state.turn.playerToDeal = bankerIdx as 0 | 1 | 2 | 3;
   }
 }
+
+export const MainStateManager = new MainStateManagerStatic();
